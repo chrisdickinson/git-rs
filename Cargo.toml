@@ -1,0 +1,6 @@
+[package]
+name = "git"
+version = "0.1.0"
+authors = ["Chris Dickinson <christopher.s.dickinson@gmail.com>"]
+
+[dependencies]
