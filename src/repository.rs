@@ -6,7 +6,7 @@ use glob::glob;
 use id::Id;
 use reference::Ref;
 use error::GitError;
-use stores::Queryable;
+use stores::{Queryable,loose};
 use objects::GitObject;
 
 #[derive(Debug)]
@@ -43,16 +43,18 @@ impl Repository {
             }
         }
 
-        Repository {
+        let mut repository = Repository {
             path: pb.clone(),
             heads: heads,
             stores: Vec::new()
-        }
+        };
+        repository.stores.push(Box::new(loose::Store::new()));
+        repository
     }
 
     pub fn get_object (&self, id: &Id) -> Result<Option<GitObject>, GitError> {
         for store in &self.stores {
-            let result = match store.get(id) {
+            let result = match store.get(self, id) {
                 Ok(v) => v,
                 Err(err) => return Err(err)
             };
