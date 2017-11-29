@@ -5,19 +5,17 @@ use std::io::prelude::*;
 
 #[derive(Debug)]
 pub struct Ref {
-    id: Id
+    id: Id,
 }
 
 impl Ref {
-    pub fn new (path: &str) -> Result<Self> {
+    pub fn new(path: &str) -> Result<Self> {
         let mut file = File::open(path)?;
         let mut contents = String::new();
 
         let written = file.read_to_string(&mut contents)?;
         let id = Id::from(&contents);
 
-        Ok(Ref {
-            id: id
-        })
+        Ok(Ref { id: id })
     }
 }

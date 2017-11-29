@@ -14,14 +14,13 @@ use repository::Repository;
 
 #[cfg(test)]
 mod tests {
-    use ::Repository;
-    use ::Path;
+    use Repository;
+    use Path;
 
     #[test]
     fn it_works() {
-        let repo = Repository::from_fs(
-            Path::new("/Users/chris/projects/personal/tempisfugit/.git")
-        );
+        let repo =
+            Repository::from_fs(Path::new("/Users/chris/projects/personal/tempisfugit/.git"));
 
         println!("repo: {:?}", repo);
     }

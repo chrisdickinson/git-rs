@@ -3,25 +3,25 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum GitError {
-    Unknown
+    Unknown,
 }
 
 impl fmt::Display for GitError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Unknown => f.write_str("Unknown git error")
+            Unknown => f.write_str("Unknown git error"),
         }
     }
 }
 
 impl error::Error for GitError {
-    fn description (&self) -> &str {
+    fn description(&self) -> &str {
         match self {
-            Unknown => "Unknown Git error"
+            Unknown => "Unknown Git error",
         }
     }
 
-    fn cause (&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&error::Error> {
         None
     }
 }

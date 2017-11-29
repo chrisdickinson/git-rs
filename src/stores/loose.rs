@@ -8,14 +8,13 @@ use id::Id;
 pub struct Store();
 
 impl Store {
-    pub fn new () -> Store {
-        Store {
-        }
+    pub fn new() -> Store {
+        Store {}
     }
 }
 
 impl Queryable for Store {
-    fn get (&self, repo: &Repository, id: &Id) -> Result<Option<GitObject>, GitError> {
+    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<GitObject>, GitError> {
         Ok(None)
     }
 }

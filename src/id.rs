@@ -3,7 +3,7 @@ use hex;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Id {
-    id: [u8; 20]
+    id: [u8; 20],
 }
 
 impl fmt::Debug for Id {
@@ -13,13 +13,11 @@ impl fmt::Debug for Id {
 }
 
 impl Id {
-    pub fn from (inp: &str) -> Id {
-        let mut identifier = Id {
-            id: [0u8; 20]
-        };
+    pub fn from(inp: &str) -> Id {
+        let mut identifier = Id { id: [0u8; 20] };
         let bytes = match hex::decode(inp.trim()) {
             Ok(xs) => xs,
-            Err(e) => return identifier
+            Err(e) => return identifier,
         };
         identifier.id.clone_from_slice(&bytes);
         identifier
