@@ -1,16 +1,23 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use reference::Ref;
+use std::vec::Vec;
 use glob::glob;
+
+use id::Id;
+use reference::Ref;
+use error::GitError;
+use stores::Queryable;
+use objects::GitObject;
 
 #[derive(Debug)]
 pub struct Repository {
     path: PathBuf,
-    heads: HashMap<String, Ref>
+    heads: HashMap<String, Ref>,
+    stores: Vec<Box<Queryable>>
 }
 
 impl Repository {
-    pub fn new (path: &Path) -> Repository {
+    pub fn from_fs (path: &Path) -> Repository {
         let mut heads = HashMap::new();
         let pb = PathBuf::from(path);
 
@@ -38,7 +45,22 @@ impl Repository {
 
         Repository {
             path: pb.clone(),
-            heads: heads
+            heads: heads,
+            stores: Vec::new()
         }
+    }
+
+    pub fn get_object (&self, id: &Id) -> Result<Option<GitObject>, GitError> {
+        for store in &self.stores {
+            let result = match store.get(id) {
+                Ok(v) => v,
+                Err(err) => return Err(err)
+            };
+
+            if let Some(obj) = result {
+                return Ok(Some(obj));
+            }
+        }
+        return Ok(None)
     }
 }

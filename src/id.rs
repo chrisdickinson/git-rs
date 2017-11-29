@@ -1,7 +1,7 @@
 use std::fmt;
 use hex;
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Id {
     id: [u8; 20]
 }

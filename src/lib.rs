@@ -1,9 +1,13 @@
 extern crate hex;
 extern crate glob;
 
-mod id;
-mod reference;
 mod repository;
+mod reference;
+mod objects;
+mod commit;
+mod stores;
+mod error;
+mod id;
 
 use std::path::{Path, PathBuf};
 use repository::Repository;
@@ -15,7 +19,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let repo = Repository::new(
+        let repo = Repository::from_fs(
             Path::new("/Users/chris/projects/personal/tempisfugit/.git")
         );
 
