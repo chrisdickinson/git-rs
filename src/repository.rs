@@ -55,6 +55,10 @@ impl Repository {
         repository
     }
 
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
+    }
+
     pub fn get_object(&self, id: &Id) -> Result<Option<GitObject>, GitError> {
         for store in &self.stores {
             let result = match store.get(self, id) {

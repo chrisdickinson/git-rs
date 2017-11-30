@@ -22,4 +22,8 @@ impl Id {
         identifier.id.clone_from_slice(&bytes);
         identifier
     }
+
+    pub fn bytes (&self) -> &[u8; 20] {
+        &self.id
+    }
 }

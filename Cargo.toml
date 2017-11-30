@@ -6,3 +6,5 @@ authors = ["Chris Dickinson <christopher.s.dickinson@gmail.com>"]
 [dependencies]
 glob = "0.2.11"
 hex = "0.3.1"
+flate2 = "1.0.1"
+multimap = "0.4.0"
