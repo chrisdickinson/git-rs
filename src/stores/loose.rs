@@ -1,10 +1,10 @@
 use flate2::bufread::DeflateDecoder;
 use std::path::{Path, PathBuf};
+use objects::commit::Commit;
 use repository::Repository;
 use objects::GitObject;
 use stores::Queryable;
 use error::GitError;
-use commit::Commit;
 use std::io::prelude::*;
 use std::fs::File;
 use std::io::ErrorKind;

@@ -6,7 +6,6 @@ extern crate hex;
 mod repository;
 mod reference;
 mod objects;
-mod commit;
 mod stores;
 mod error;
 mod id;
