@@ -5,7 +5,7 @@ use std::io::prelude::*;
 
 #[derive(Debug)]
 pub struct Ref {
-    id: Id,
+    _id: Id,
 }
 
 impl Ref {
@@ -14,8 +14,12 @@ impl Ref {
         let mut contents = String::new();
 
         let written = file.read_to_string(&mut contents)?;
-        let id = Id::from(&contents);
+        let id = Id::from(&contents).expect("failed to read ID");
 
-        Ok(Ref { id: id })
+        Ok(Ref { _id: id })
+    }
+
+    pub fn to_id (&self) -> Id {
+        Id::clone(&self._id)
     }
 }

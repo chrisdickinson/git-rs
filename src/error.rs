@@ -1,9 +1,13 @@
 use std::error;
 use std::fmt;
+use std;
+use hex;
 
 #[derive(Debug)]
 pub enum GitError {
     Unknown,
+    InvalidID(hex::FromHexError),
+    BadReference(std::io::Error)
 }
 
 impl fmt::Display for GitError {

@@ -1,5 +1,4 @@
 use flate2::bufread::DeflateDecoder;
-use std::path::{Path, PathBuf};
 use objects::commit::Commit;
 use repository::Repository;
 use objects::GitObject;
@@ -7,8 +6,8 @@ use stores::Queryable;
 use error::GitError;
 use std::io::prelude::*;
 use std::fs::File;
-use std::io::ErrorKind;
 use std::str;
+use std::io;
 use id::Id;
 use hex;
 
@@ -35,10 +34,10 @@ impl Queryable for Store {
         let mut file = match File::open(pb.as_path()) {
             Ok(f) => f,
             Err(e) => {
-                return match e {
-                    NotFound => return Ok(None),
+                match e.kind() {
+                    io::ErrorKind::NotFound => return Ok(None),
                     _ => return Err(GitError::Unknown)
-                };
+                }
             }
         };
 

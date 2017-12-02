@@ -10,17 +10,12 @@ mod stores;
 mod error;
 mod id;
 
-use std::path::{Path, PathBuf};
-use repository::Repository;
-use objects::GitObject;
-use id::Id;
-
 #[cfg(test)]
 mod tests {
-    use Repository;
-    use Path;
-    use Id;
-    use GitObject;
+    use repository::Repository;
+    use std::path::Path;
+    use id::Id;
+    use objects::GitObject;
 
     #[test]
     fn it_works() {
@@ -35,23 +30,28 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let mut id = Id::from("89012d389533666964c4a0032249796c3a3b3ba6");
+        let mut id = match repo.rev_parse("master") {
+            Some(xs) => xs,
+            None => return
+        };
         loop {
             if let Ok(Some(result)) = repo.get_object(&id) {
                 if let GitObject::CommitObject(commit) = result {
-                    println!("{:?} {}", id, commit.message());
-                    let parents = match commit.parents(&repo) {
+                    println!("{} {}", id, commit.message().trim());
+                    let parents = match commit.parents() {
                         Some(v) => v,
-                        None => break
+                        None => return
                     };
                     if let Some(parent) = parents.first() {
-                        id = Id::from(parent.as_str());
-                    } else { break }
+                        id = Id::from(parent.as_str()).expect("failed to get ID");
+                    } else {
+                        return
+                    }
                 } else {
-                    break
+                    return
                 }
             } else {
-                break
+                return
             }
         }
     }

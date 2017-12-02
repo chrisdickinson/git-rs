@@ -1,3 +1,4 @@
+use error::GitError;
 use std::fmt;
 use hex;
 
@@ -12,15 +13,21 @@ impl fmt::Debug for Id {
     }
 }
 
+impl fmt::Display for Id {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        hex::encode(self.id).fmt(formatter)
+    }
+}
+
 impl Id {
-    pub fn from(inp: &str) -> Id {
+    pub fn from(inp: &str) -> Result<Id, GitError> {
         let mut identifier = Id { id: [0u8; 20] };
         let bytes = match hex::decode(inp.trim()) {
             Ok(xs) => xs,
-            Err(e) => return identifier,
+            Err(e) => return Err(GitError::InvalidID(e)),
         };
         identifier.id.clone_from_slice(&bytes);
-        identifier
+        Ok(identifier)
     }
 
     pub fn bytes (&self) -> &[u8; 20] {

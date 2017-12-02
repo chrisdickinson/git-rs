@@ -59,6 +59,25 @@ impl Repository {
         self.path.as_path()
     }
 
+    pub fn rev_parse (&self, what: &str) -> Option<Id> {
+        if let Ok(id) = Id::from(what) {
+            return Some(id)
+        }
+
+        if let Some(head) = self.heads.get(what) {
+            return Some(head.to_id())
+        }
+
+        return None
+    }
+
+    pub fn lookup (&self, what: &str) -> Result<Option<GitObject>, GitError> {
+        if let Some(id) = self.rev_parse(what) {
+            return self.get_object(&id)
+        }
+        Ok(None)
+    }
+
     pub fn get_object(&self, id: &Id) -> Result<Option<GitObject>, GitError> {
         for store in &self.stores {
             let result = match store.get(self, id) {

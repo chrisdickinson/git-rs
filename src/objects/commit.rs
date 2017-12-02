@@ -1,10 +1,7 @@
 use id::Id;
 use std::str;
 use std::vec::Vec;
-use std::error::Error;
 use multimap::MultiMap;
-
-use repository::Repository;
 
 #[derive(Debug)]
 pub struct Commit {
@@ -91,7 +88,7 @@ impl Commit {
         self.message.as_str()
     }
 
-    pub fn parents(&self, repo: &Repository) -> Option<&Vec<String>> {
+    pub fn parents(&self) -> Option<&Vec<String>> {
         self.attributes.get_vec("parent")
     }
 
