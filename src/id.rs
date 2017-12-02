@@ -30,6 +30,14 @@ impl Id {
         Ok(identifier)
     }
 
+    pub fn from_bytes(inp: &[u8]) -> Id {
+        let mut dst = [0u8; 20];
+        dst.clone_from_slice(&inp);
+        Id {
+            id: dst
+        }
+    }
+
     pub fn bytes (&self) -> &[u8; 20] {
         &self.id
     }

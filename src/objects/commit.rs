@@ -88,6 +88,10 @@ impl Commit {
         self.message.as_str()
     }
 
+    pub fn tree(&self) -> Option<&String> {
+        self.attributes.get("tree")
+    }
+
     pub fn parents(&self) -> Option<&Vec<String>> {
         self.attributes.get_vec("parent")
     }

@@ -1,5 +1,6 @@
 use flate2::bufread::DeflateDecoder;
 use objects::commit::Commit;
+use objects::tree::Tree;
 use repository::Repository;
 use objects::GitObject;
 use stores::Queryable;
@@ -89,6 +90,7 @@ impl Queryable for Store {
 
         match strtype {
             "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, &decoded_bytes[1 + size_nul_idx..])))),
+            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, &decoded_bytes[1 + size_nul_idx..])))),
             &_ => return Err(GitError::Unknown)
         }
     }

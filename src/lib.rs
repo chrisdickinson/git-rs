@@ -26,7 +26,7 @@ mod tests {
     }
 
     #[test]
-    fn it_works_pt_deux() {
+    fn commits() {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
@@ -54,5 +54,31 @@ mod tests {
                 return
             }
         }
+    }
+
+    #[test]
+    fn commit_tree() {
+        let repo =
+            Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
+
+        let mut id = match repo.rev_parse("master") {
+            Some(xs) => xs,
+            None => return
+        };
+        let result = match repo.get_object(&id) {
+            Ok(xs) => match xs { Some(ys) => ys, None => return },
+            Err(_) => return
+        };
+        let commit = match result {
+            GitObject::CommitObject(xs) => xs,
+            _ => return
+        };
+        let tree_id = match commit.tree() {
+            Some(xs) => xs,
+            None => return
+        };
+
+        let tree = repo.get_object(&Id::from(tree_id).expect("bad tree"));
+        println!("tree: {:?}", tree);
     }
 }
