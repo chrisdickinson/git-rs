@@ -12,7 +12,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn from(id: &Id, handle: &mut Box<std::io::Read>) -> Commit {
+    pub fn from(id: &Id, mut handle: Box<std::io::Read>) -> Commit {
         // layout is:
         // attr SP value NL
         // NL

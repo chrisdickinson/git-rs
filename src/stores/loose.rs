@@ -1,6 +1,7 @@
 use flate2::bufread::DeflateDecoder;
 use objects::commit::Commit;
 use objects::tree::Tree;
+use objects::blob::Blob;
 use repository::Repository;
 use objects::GitObject;
 use stores::Queryable;
@@ -121,8 +122,9 @@ impl Queryable for Store {
         let mut body_handle = header_handle;
 
         match typename {
-            "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, &mut body_handle)))),
-            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, &mut body_handle)))),
+            "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, body_handle)))),
+            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, body_handle)))),
+            "blob" => Ok(Some(GitObject::BlobObject(Blob::from(id, body_handle)))),
             &_ => return Err(GitError::Unknown)
         }
     }

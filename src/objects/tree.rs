@@ -8,8 +8,8 @@ pub struct FileMode(u32);
 
 #[derive(Debug)]
 pub struct TreeEntry {
-    mode: FileMode,
-    id: Id
+    pub mode: FileMode,
+    pub id: Id
 }
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ pub struct Tree {
 
 // layout is: ascii octal mode SP name NUL hex*20
 impl Tree {
-    pub fn from(id: &Id, handle: &mut Box<std::io::Read>) -> Tree {
+    pub fn from(id: &Id, mut handle: Box<std::io::Read>) -> Tree {
         let mut vec = Vec::new();
         handle.read_to_end(&mut vec);
         let buf = &vec;
@@ -56,9 +56,13 @@ impl Tree {
                     }
                 },
                 Mode::CollectHash => {
-                    if idx - null < 21{
+                    if idx - null < 20 {
                         Mode::CollectHash
                     } else {
+                        let name = match str::from_utf8(&buf[space + 1..null]) {
+                            Ok(xs) => xs,
+                            Err(e) => break
+                        };
                         let mode_str = match str::from_utf8(&buf[anchor..space]) {
                             Ok(xs) => xs,
                             Err(e) => break
@@ -67,14 +71,10 @@ impl Tree {
                             Ok(xs) => xs,
                             Err(e) => break
                         };
-                        let name = match str::from_utf8(&buf[space + 1..null]) {
-                            Ok(xs) => xs,
-                            Err(e) => break
-                        };
 
                         entries.insert(name.to_string(), TreeEntry {
                             mode: FileMode(mode),
-                            id: Id::from_bytes(&buf[null + 1..idx])
+                            id: Id::from_bytes(&buf[null + 1..idx + 1])
                         });
 
                         anchor = idx + 1;
@@ -90,5 +90,8 @@ impl Tree {
             id: Id::clone(id)
         }
     }
-}
 
+    pub fn lookup (&self, name: &str) -> Option<&TreeEntry> {
+        self.entries.get(name)
+    }
+}

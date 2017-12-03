@@ -84,4 +84,27 @@ mod tests {
         let tree = repo.get_object(&Id::from(tree_id).expect("bad tree"));
         println!("tree: {:?}", tree);
     }
+
+    #[test]
+    fn commit_blob() {
+        let repo =
+            Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
+
+        let mut id = match repo.rev_parse("master") {
+            Some(xs) => xs,
+            None => return
+        };
+        let result = match repo.get_object(&id) {
+            Ok(xs) => match xs { Some(ys) => ys, None => return },
+            Err(_) => return
+        };
+        let commit = match result {
+            GitObject::CommitObject(xs) => xs,
+            _ => return
+        };
+
+        let target = repo.get_path_at_commit(&commit, vec!("src", "stores", "loose.rs"));
+
+        println!("blob: {:?}", target);
+    }
 }

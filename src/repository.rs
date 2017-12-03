@@ -8,6 +8,8 @@ use reference::Ref;
 use error::GitError;
 use stores::{Queryable, loose};
 use objects::GitObject;
+use objects::tree::Tree;
+use objects::commit::Commit;
 
 #[derive(Debug)]
 pub struct Repository {
@@ -90,5 +92,53 @@ impl Repository {
             }
         }
         return Ok(None);
+    }
+
+    pub fn get_path_at_commit(&self, what: &Commit, path: Vec<&str>) -> Result<Option<GitObject>, GitError> {
+        let tree_id_str = match what.tree() {
+            Some(xs) => xs,
+            None => return Ok(None)
+        };
+
+        let tree_id = Id::from(tree_id_str)?;
+        let tree = match self.get_object(&tree_id)? {
+            Some(git_object) => {
+                match git_object {
+                    GitObject::TreeObject(tree) => tree,
+                    _ => return Ok(None)
+                }
+            },
+            None => return Ok(None)
+        };
+
+        let result = path.iter().fold(Ok(Some(GitObject::TreeObject(tree))), |prev: Result<Option<GitObject>, GitError>, xs| {
+            let object = match prev? {
+                Some(xs) => xs,
+                None => return Ok(None)
+            };
+
+            let tree = match object {
+                GitObject::TreeObject(tree) => tree,
+                _ => return Ok(None)
+            };
+
+            let entry = match tree.lookup(xs) {
+                Some(xs) => xs,
+                None => return Ok(None)
+            };
+
+            let next_object = match self.get_object(&entry.id)? {
+                Some(git_object) => git_object,
+                None => return Ok(None)
+            };
+
+            match next_object {
+                GitObject::TreeObject(next_tree) => Ok(Some(GitObject::TreeObject(next_tree))),
+                GitObject::BlobObject(next_blob) => Ok(Some(GitObject::BlobObject(next_blob))),
+                _ => return Ok(None)
+            }
+        });
+
+        result
     }
 }
