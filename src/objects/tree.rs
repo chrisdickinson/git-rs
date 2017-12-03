@@ -1,3 +1,4 @@
+use std;
 use std::collections::HashMap;
 use std::str;
 use id::Id;
@@ -19,7 +20,10 @@ pub struct Tree {
 
 // layout is: ascii octal mode SP name NUL hex*20
 impl Tree {
-    pub fn from(id: &Id, buf: &[u8]) -> Tree {
+    pub fn from(id: &Id, handle: &mut Box<std::io::Read>) -> Tree {
+        let mut vec = Vec::new();
+        handle.read_to_end(&mut vec);
+        let buf = &vec;
 
         #[derive(Debug)] 
         enum Mode {

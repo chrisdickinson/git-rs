@@ -1,3 +1,4 @@
+use std;
 use id::Id;
 use std::str;
 use std::vec::Vec;
@@ -11,11 +12,15 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn from(id: &Id, buf: &[u8]) -> Commit {
+    pub fn from(id: &Id, handle: &mut Box<std::io::Read>) -> Commit {
         // layout is:
         // attr SP value NL
         // NL
         // message
+
+        let mut vec = Vec::new();
+        handle.read_to_end(&mut vec);
+        let buf = &vec;
 
         #[derive(Debug)]
         enum Mode {

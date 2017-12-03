@@ -6,10 +6,12 @@ use objects::GitObject;
 use stores::Queryable;
 use error::GitError;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::fs::File;
 use std::str;
 use std::io;
 use id::Id;
+use std;
 use hex;
 
 #[derive(Debug)]
@@ -42,55 +44,85 @@ impl Queryable for Store {
             }
         };
 
-
-        let mut bytes = Vec::new();
-        let written = match file.read_to_end(&mut bytes) {
-            Ok(w) => w,
+        let mut buffered_file = BufReader::new(file);
+        let mut sig_handle = buffered_file.take(2);
+        let mut sig_bytes = [0u8; 2];
+        match sig_handle.read(&mut sig_bytes) {
             Err(e) => {
                 return Err(GitError::Unknown)
-            }
+            },
+            Ok(_) => {}
         };
-
-        let w0 = bytes[0] as u16;
-        let w1 = bytes[1] as u16;
+        let w0 = sig_bytes[0] as u16;
+        let w1 = sig_bytes[1] as u16;
         let word = (w0 << 8) + w1;
+
+        let mut file_after_sig = sig_handle.into_inner();
 
         // !!! next step is:
         // check to see is_zlib = w0 === 0x78 && !(word % 31)
         // then "commit" | "tree" | "blob" | "tag" SP SIZE NUL body
         let is_deflate = w0 == 0x78 && ((word & 31) != 0);
-        let decoded_bytes = if is_deflate {
-            let mut decoder = DeflateDecoder::new(&bytes[2..]);
-            let mut result = Vec::new();
-            match decoder.read_to_end(&mut result) {
-                Ok(_) => (),
-                Err(e) => {
-                    return Err(GitError::Unknown)
+        let mut decoder_handle: Box<std::io::Read> = if is_deflate {
+            Box::new(DeflateDecoder::new(file_after_sig))
+        } else {
+            Box::new(file_after_sig)
+        };
+
+        let mut type_vec = Vec::new();
+        let mut size_vec = Vec::new();
+        enum Mode {
+            FindSpace,
+            FindNull
+        };
+        let mut mode = Mode::FindSpace;
+
+        let mut header_handle = decoder_handle;
+        loop {
+            let mut next_handle = header_handle.take(1);
+            let mut header_byte = [0u8; 1];
+            match next_handle.read(&mut header_byte) {
+                Err(e) => return Err(GitError::Unknown),
+                Ok(_) => {}
+            };
+            let next = match mode {
+                Mode::FindSpace => {
+                    match header_byte[0] {
+                        0x20 => {
+                            Mode::FindNull
+                        },
+                        xs => {
+                            type_vec.push(xs);
+                            Mode::FindSpace
+                        }
+                    }
+                },
+                Mode::FindNull => {
+                    match header_byte[0] {
+                        0x0 => {
+                            header_handle = next_handle.into_inner();
+                            break
+                        },
+                        xs => {
+                            size_vec.push(xs);
+                            Mode::FindNull
+                        }
+                    }
                 }
             };
-            result
-        } else {
-            bytes.to_vec()
-        };
+            mode = next;
+            header_handle = next_handle.into_inner();
+        }
 
-        let type_sp_idx = match decoded_bytes.iter().position(|&xs| xs == 0x20) {
-            Some(idx) => idx,
-            None => return Err(GitError::Unknown)
-        };
-
-        let size_nul_idx = match decoded_bytes.iter().position(|&xs| xs == 0) {
-            Some(idx) => idx,
-            None => return Err(GitError::Unknown)
-        };
-
-        let strtype = match str::from_utf8(&decoded_bytes[0..type_sp_idx]) {
+        let typename = match str::from_utf8(&type_vec) {
             Ok(xs) => xs,
             Err(e) => return Err(GitError::Unknown)
         };
+        let mut body_handle = header_handle;
 
-        match strtype {
-            "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, &decoded_bytes[1 + size_nul_idx..])))),
-            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, &decoded_bytes[1 + size_nul_idx..])))),
+        match typename {
+            "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, &mut body_handle)))),
+            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, &mut body_handle)))),
             &_ => return Err(GitError::Unknown)
         }
     }

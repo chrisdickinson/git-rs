@@ -37,10 +37,13 @@ mod tests {
         loop {
             if let Ok(Some(result)) = repo.get_object(&id) {
                 if let GitObject::CommitObject(commit) = result {
-                    println!("{} {}", id, commit.message().trim());
+                    println!("commit {} {}", id, commit.message().trim());
                     let parents = match commit.parents() {
                         Some(v) => v,
-                        None => return
+                        None => {
+                            println!("no gods, no parents");
+                            return
+                        }
                     };
                     if let Some(parent) = parents.first() {
                         id = Id::from(parent.as_str()).expect("failed to get ID");
