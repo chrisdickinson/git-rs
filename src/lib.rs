@@ -1,3 +1,4 @@
+extern crate byteorder;
 extern crate multimap;
 extern crate flate2;
 extern crate glob;
@@ -16,6 +17,7 @@ mod tests {
     use std::path::Path;
     use id::Id;
     use objects::GitObject;
+    use std::io::Read;
 
     #[test]
     fn it_works() {
@@ -64,7 +66,7 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let mut id = match repo.rev_parse("master") {
+        let id = match repo.rev_parse("master") {
             Some(xs) => xs,
             None => return
         };
@@ -90,7 +92,7 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let mut id = match repo.rev_parse("master") {
+        let id = match repo.rev_parse("master") {
             Some(xs) => xs,
             None => return
         };
@@ -103,8 +105,23 @@ mod tests {
             _ => return
         };
 
-        let target = repo.get_path_at_commit(&commit, vec!("src", "stores", "loose.rs"));
+        let git_object = match repo.get_path_at_commit(&commit, vec!("src", "stores", "loose.rs")) { 
+            Ok(target) => match target {
+                Some(git_object) => git_object,
+                None => return
+            },
+            Err(_) => return
+        };
+        let mut git_blob = match git_object {
+            GitObject::BlobObject(xs) => xs,
+            _ => return
+        };
 
-        println!("blob: {:?}", target);
+        let mut contents = String::new();
+        let bytes_read = match git_blob.read_to_string(&mut contents) {
+            Ok(xs) => xs,
+            Err(e) => return
+        };
+        println!("blob: {:?}", contents);
     }
 }

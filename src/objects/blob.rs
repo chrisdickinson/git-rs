@@ -2,28 +2,16 @@ use std;
 use id::Id;
 use std::cell::RefCell;
 
-enum BlobContents {
-    Pending(Box<std::io::Read>),
-    Resident(Vec<u8>)
-}
-
-#[derive(Debug)]
 pub struct Blob {
     id: Id,
-    data: RefCell<BlobContents>
+    contents: Box<std::io::Read>
 }
 
-impl std::fmt::Debug for BlobContents {
+impl std::fmt::Debug for Blob {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BlobContents::Pending(_) => formatter.write_str(
-                "BlobContents { <pending> }"),
-            BlobContents::Resident(ref vec) => formatter.write_str(
-                "BlobContents { <resident> }")
-        }
+        formatter.write_str("Blob { }")
     }
 }
-
 
 impl Blob {
     pub fn from (id: &Id, mut handle: Box<std::io::Read>) -> Blob {
@@ -31,7 +19,13 @@ impl Blob {
 
         Blob {
             id: Id::clone(id),
-            data: RefCell::new(BlobContents::Pending(reader))
+            contents: reader
         }
+    }
+}
+
+impl std::io::Read for Blob {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.contents.read(buf)
     }
 }

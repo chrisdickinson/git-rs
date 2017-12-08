@@ -19,6 +19,12 @@ impl fmt::Display for Id {
     }
 }
 
+pub enum Cmp {
+    Lesser,
+    Greater,
+    Same
+}
+
 impl Id {
     pub fn from(inp: &str) -> Result<Id, GitError> {
         let mut identifier = Id { id: [0u8; 20] };
@@ -38,7 +44,18 @@ impl Id {
         }
     }
 
-    pub fn bytes (&self) -> &[u8; 20] {
+    pub fn as_slice (&self) -> &[u8; 20] {
         &self.id
+    }
+
+    pub fn compare (&self, rhs: &Id) -> Cmp {
+        for idx in 0..20 {
+            if self.id[idx] < rhs.id[idx] {
+                return Cmp::Lesser
+            } else if self.id[idx] > rhs.id[idx] {
+                return Cmp::Greater
+            }
+        }
+        Cmp::Same
     }
 }

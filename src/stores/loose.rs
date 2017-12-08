@@ -27,7 +27,7 @@ impl Store {
 impl Queryable for Store {
     fn get(&self, repo: &Repository, id: &Id) -> Result<Option<GitObject>, GitError> {
 
-        let bytes: &[u8; 20] = id.bytes();
+        let bytes: &[u8; 20] = id.as_slice();
         let first = hex::encode(&bytes[0..1]);
         let rest = hex::encode(&bytes[1..20]);
         let mut pb = repo.path().to_path_buf();
@@ -35,7 +35,7 @@ impl Queryable for Store {
         pb.push(first);
         pb.push(rest);
 
-        let mut file = match File::open(pb.as_path()) {
+        let file = match File::open(pb.as_path()) {
             Ok(f) => f,
             Err(e) => {
                 match e.kind() {
@@ -45,7 +45,7 @@ impl Queryable for Store {
             }
         };
 
-        let mut buffered_file = BufReader::new(file);
+        let buffered_file = BufReader::new(file);
         let mut sig_handle = buffered_file.take(2);
         let mut sig_bytes = [0u8; 2];
         match sig_handle.read(&mut sig_bytes) {
@@ -58,13 +58,13 @@ impl Queryable for Store {
         let w1 = sig_bytes[1] as u16;
         let word = (w0 << 8) + w1;
 
-        let mut file_after_sig = sig_handle.into_inner();
+        let file_after_sig = sig_handle.into_inner();
 
         // !!! next step is:
         // check to see is_zlib = w0 === 0x78 && !(word % 31)
         // then "commit" | "tree" | "blob" | "tag" SP SIZE NUL body
         let is_deflate = w0 == 0x78 && ((word & 31) != 0);
-        let mut decoder_handle: Box<std::io::Read> = if is_deflate {
+        let decoder_handle: Box<std::io::Read> = if is_deflate {
             Box::new(DeflateDecoder::new(file_after_sig))
         } else {
             Box::new(file_after_sig)
@@ -119,7 +119,7 @@ impl Queryable for Store {
             Ok(xs) => xs,
             Err(e) => return Err(GitError::Unknown)
         };
-        let mut body_handle = header_handle;
+        let body_handle = header_handle;
 
         match typename {
             "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, body_handle)))),

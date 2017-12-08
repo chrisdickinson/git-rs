@@ -8,7 +8,6 @@ use reference::Ref;
 use error::GitError;
 use stores::{Queryable, loose};
 use objects::GitObject;
-use objects::tree::Tree;
 use objects::commit::Commit;
 
 #[derive(Debug)]
