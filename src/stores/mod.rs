@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 pub mod loose;
-pub mod index;
 pub mod pack;
 
 use id::Id;

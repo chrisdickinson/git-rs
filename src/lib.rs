@@ -5,6 +5,7 @@ extern crate glob;
 extern crate hex;
 
 mod repository;
+mod packindex;
 mod reference;
 mod objects;
 mod stores;

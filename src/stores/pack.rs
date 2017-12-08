@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::path::{Path, PathBuf};
-use stores::index::Index;
 use std::io::prelude::*;
 use std::io::BufReader;
 use stores::Queryable;
+use packindex::Index;
 use error::GitError;
 use std::fs::File;
 use std::io;
