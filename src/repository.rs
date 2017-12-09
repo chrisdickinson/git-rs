@@ -22,13 +22,13 @@ impl Repository {
         let mut heads = HashMap::new();
         let pb = PathBuf::from(path);
 
-        let mut glob_path = pb.clone();
-        glob_path.push("refs");
-        glob_path.push("heads");
-        glob_path.push("*");
+        let mut glob_refs_path = pb.clone();
+        glob_refs_path.push("refs");
+        glob_refs_path.push("heads");
+        glob_refs_path.push("*");
 
-        if let Some(glob_path_str) = glob_path.to_str() {
-            for entry in glob(glob_path_str).expect("Weena wonga") {
+        if let Some(glob_refs_path_str) = glob_refs_path.to_str() {
+            for entry in glob(glob_refs_path_str).expect("Weena wonga") {
                 let item = match entry {
                     Ok(item) => item,
                     Err(_e) => continue,
