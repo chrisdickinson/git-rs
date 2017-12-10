@@ -19,7 +19,7 @@ impl Commit {
         // message
 
         let mut vec = Vec::new();
-        handle.read_to_end(&mut vec);
+        let r2e_result = handle.read_to_end(&mut vec);
         let buf = &vec;
 
         #[derive(Debug)]

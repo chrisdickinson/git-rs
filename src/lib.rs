@@ -18,14 +18,15 @@ mod tests {
     use std::path::Path;
     use id::Id;
     use objects::GitObject;
-    use std::io::Read;
+    use std::io::{Cursor, Read};
+    use flate2::bufread::DeflateDecoder;
 
     #[test]
     fn it_works() {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/tempisfugit/.git"));
 
-        println!("repo: {:?}", repo);
+        // println!("repo: {:?}", repo);
     }
 
     #[test]
@@ -123,6 +124,6 @@ mod tests {
             Ok(xs) => xs,
             Err(e) => return
         };
-        println!("blob: {:?}", contents);
+        // println!("blob: {:?}", contents);
     }
 }

@@ -6,9 +6,9 @@ use glob::glob;
 use id::Id;
 use reference::Ref;
 use error::GitError;
-use stores::{Queryable, loose};
 use objects::GitObject;
 use objects::commit::Commit;
+use stores::{Queryable, loose, pack};
 
 #[derive(Debug)]
 pub struct Repository {
@@ -53,6 +53,37 @@ impl Repository {
             stores: Vec::new(),
         };
         repository.stores.push(Box::new(loose::Store::new()));
+
+        let mut glob_packs_path = pb.clone();
+        glob_packs_path.push("objects");
+        glob_packs_path.push("pack");
+        glob_packs_path.push("*.idx");
+
+        if let Some(glob_packs_path_str) = glob_packs_path.to_str() {
+            for entry in glob(glob_packs_path_str).expect("Weena wonga") {
+                let item = match entry {
+                    Ok(item) => item,
+                    Err(_e) => continue,
+                };
+
+                if let Some(item_as_str) = item.to_str() {
+                    let pack_idx_path = PathBuf::from(item_as_str);
+                    let mut pack_path = pack_idx_path.clone();
+                    pack_path.set_extension("pack");
+
+                    let store = match pack::Store::new(
+                        &pack_idx_path,
+                        &pack_path
+                    ) {
+                        Ok(xs) => xs,
+                        Err(_) => continue
+                    };
+
+                    repository.stores.push(Box::new(store));
+                }
+            }
+        }
+
         repository
     }
 

@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt};
 use std::path::{Path, PathBuf};
 use error::GitError;
 use std::io;
@@ -42,7 +42,7 @@ struct Fanout ([u32; 256]);
 
 impl std::fmt::Debug for Fanout {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("Format { }")
+        formatter.write_str("Fanout { }")
     }
 }
 
@@ -129,9 +129,10 @@ impl Index {
             0
         };
         let mut hi = self.fanout.0[as_bytes[0] as usize];
+        let mut middle: usize;
 
         loop {
-            let middle = ((lo + hi) >> 1) as usize;
+            middle = ((lo + hi) >> 1) as usize;
             if middle > self.objects.len() {
                 return None
             }

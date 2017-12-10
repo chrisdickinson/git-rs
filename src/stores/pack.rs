@@ -52,7 +52,7 @@ pub struct Store {
 //      N objects
 //      20 byte checksum
 impl Store {
-    pub fn from(index_path: &Path, packfile_path: &Path) -> Result<Store, GitError> {
+    pub fn new(index_path: &Path, packfile_path: &Path) -> Result<Store, GitError> {
         let file = File::open(index_path)?;
         let buffered_file = BufReader::new(file);
         let index = Index::from(Box::new(buffered_file))?;
@@ -75,7 +75,6 @@ impl Queryable for Store {
         buffered_file.seek(SeekFrom::Start(start))?;
         let mut stream = buffered_file.take(end - start);
 
-
         // type + size bytes
         let mut continuation = 0;
         let mut type_flag = 0;
@@ -87,7 +86,7 @@ impl Queryable for Store {
         let mut original_stream = take_one.into_inner();
         continuation = byte[0] & 0x80;
         type_flag = (byte[0] & 0x70) >> 4;
-        size_vec.push(byte[0] & 0x0f); 
+        size_vec.push(byte[0] & 0x0f);
         loop {
             if continuation < 1 {
                 break
@@ -115,6 +114,9 @@ impl Queryable for Store {
         }
 
         let (t, decoder_stream): (u8, Box<std::io::Read>) = if type_flag <= 4 {
+            // grumble, grumble: we must strip the zlib header off of our content.
+            let mut zlib_header = [0u8; 2];
+            object_stream.read_exact(&mut zlib_header)?;
             (type_flag, Box::new(DeflateDecoder::new(object_stream)))
         } else {
             let decoder = DeltaDecoder::new(Box::new(object_stream), self, repo);
@@ -122,14 +124,14 @@ impl Queryable for Store {
             (final_type, Box::new(decoder))
         };
 
-        // cttt ssss csss ssss csss ssss
-        // ### you left off here. match the type & read the zlib'd bytes.
+        if t == 1 {
+            return Ok(Some(GitObject::CommitObject(Commit::from(id, decoder_stream))));
+        }
+
         match t {
             _ => Err(GitError::Unknown),
-            1 => Ok(Some(GitObject::CommitObject(Commit::from(id, decoder_stream)))),
             2 => Ok(Some(GitObject::TreeObject(Tree::from(id, decoder_stream)))),
             3 => Ok(Some(GitObject::BlobObject(Blob::from(id, decoder_stream))))
-
         }
     }
 }
