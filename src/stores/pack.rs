@@ -126,12 +126,11 @@ impl Queryable for Store {
 
         if t == 1 {
             return Ok(Some(GitObject::CommitObject(Commit::from(id, decoder_stream))));
+        } else if t == 2 {
+            return Ok(Some(GitObject::TreeObject(Tree::from(id, decoder_stream))));
+        } else if t == 3 {
+            return Ok(Some(GitObject::BlobObject(Blob::from(id, decoder_stream))));
         }
-
-        match t {
-            _ => Err(GitError::Unknown),
-            2 => Ok(Some(GitObject::TreeObject(Tree::from(id, decoder_stream)))),
-            3 => Ok(Some(GitObject::BlobObject(Blob::from(id, decoder_stream))))
-        }
+        Err(GitError::Unknown)
     }
 }
