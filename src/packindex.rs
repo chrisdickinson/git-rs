@@ -1,7 +1,5 @@
-use byteorder::{LittleEndian, BigEndian, ReadBytesExt};
-use std::path::{Path, PathBuf};
+use byteorder::{BigEndian, ReadBytesExt};
 use error::GitError;
-use std::io;
 use id::{Id, Cmp};
 use std;
 
@@ -152,7 +150,7 @@ impl Index {
                 }
             };
 
-            if (lo >= hi) {
+            if lo >= hi {
                 break
             }
         }

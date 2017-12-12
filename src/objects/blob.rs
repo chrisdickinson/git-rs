@@ -1,6 +1,5 @@
 use std;
 use id::Id;
-use std::cell::RefCell;
 
 pub struct Blob {
     id: Id,

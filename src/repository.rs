@@ -22,6 +22,11 @@ impl Repository {
         let mut heads = HashMap::new();
         let pb = PathBuf::from(path);
 
+        let mut packed_refs_path = pb.clone();
+        packed_refs_path.push("packed-refs");
+
+        Ref::from_packed(packed_refs_path.to_str().unwrap(), &mut heads);
+
         let mut glob_refs_path = pb.clone();
         glob_refs_path.push("refs");
         glob_refs_path.push("heads");
@@ -35,8 +40,8 @@ impl Repository {
                 };
                 if let Some(item_as_str) = item.to_str() {
                     let name = item_as_str.replace(pb.to_str().unwrap(), "").replace(
-                        "/refs/heads/",
-                        "",
+                        "/refs/",
+                        "/",
                     );
 
                     if let Ok(reference) = Ref::new(item_as_str) {
@@ -111,8 +116,11 @@ impl Repository {
     }
 
     pub fn get_object(&self, id: &Id) -> Result<Option<GitObject>, GitError> {
+        println!("get_object {:?}", id);
         for store in &self.stores {
-            let result = match store.get(self, id) {
+            let xs = store.get(self, id);
+            println!("??? {:?}", xs);
+            let result = match xs {
                 Ok(v) => v,
                 Err(err) => return Err(err),
             };

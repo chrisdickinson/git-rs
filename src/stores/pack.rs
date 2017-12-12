@@ -1,4 +1,3 @@
-use byteorder::{BigEndian, ReadBytesExt};
 use flate2::bufread::DeflateDecoder;
 use std::io::{BufReader, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -7,37 +6,15 @@ use stores::Queryable;
 use packindex::Index;
 use error::GitError;
 use std::fs::File;
-use std::io;
 use id::Id;
 use std;
 
+use delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
 use repository::Repository;
 use objects::commit::Commit;
 use objects::tree::Tree;
 use objects::blob::Blob;
 use objects::GitObject;
-
-const OFS_DELTA: u8 = 6;
-const REF_DELTA: u8 = 7;
-
-pub struct DeltaDecoder {
-}
-
-impl DeltaDecoder {
-    pub fn new (stream: Box<std::io::Read>, store: &Store, repo: &Repository) -> DeltaDecoder {
-        DeltaDecoder {}
-    }
-
-    pub fn get_type(&self) -> u8 {
-        0
-    }
-}
-
-impl std::io::Read for DeltaDecoder {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        Ok(0)
-    }
-}
 
 #[derive(Debug)]
 pub struct Store {
@@ -73,7 +50,7 @@ impl Queryable for Store {
         let file = File::open(&self.packfile_path)?;
         let mut buffered_file = BufReader::new(file);
         buffered_file.seek(SeekFrom::Start(start))?;
-        let mut stream = buffered_file.take(end - start);
+        let stream = buffered_file.take(end - start);
 
         // type + size bytes
         let mut continuation = 0;
@@ -119,7 +96,11 @@ impl Queryable for Store {
             object_stream.read_exact(&mut zlib_header)?;
             (type_flag, Box::new(DeflateDecoder::new(object_stream)))
         } else {
-            let decoder = DeltaDecoder::new(Box::new(object_stream), self, repo);
+            let decoder = if type_flag == OFS_DELTA {
+                DeltaDecoder::from_offset_delta(Box::new(object_stream), self)
+            } else {
+                DeltaDecoder::from_ref_delta(Box::new(object_stream), repo)
+            };
             let final_type = decoder.get_type();
             (final_type, Box::new(decoder))
         };
@@ -131,6 +112,7 @@ impl Queryable for Store {
         } else if t == 3 {
             return Ok(Some(GitObject::BlobObject(Blob::from(id, decoder_stream))));
         }
+        println!("pack get: {:?}", t);
         Err(GitError::Unknown)
     }
 }

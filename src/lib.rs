@@ -1,6 +1,8 @@
+#[macro_use] extern crate lazy_static;
 extern crate byteorder;
 extern crate multimap;
 extern crate flate2;
+extern crate regex;
 extern crate glob;
 extern crate hex;
 
@@ -9,6 +11,7 @@ mod packindex;
 mod reference;
 mod objects;
 mod stores;
+mod delta;
 mod error;
 mod id;
 
@@ -18,8 +21,7 @@ mod tests {
     use std::path::Path;
     use id::Id;
     use objects::GitObject;
-    use std::io::{Cursor, Read};
-    use flate2::bufread::DeflateDecoder;
+    use std::io::Read;
 
     #[test]
     fn it_works() {
@@ -34,7 +36,7 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let mut id = match repo.rev_parse("master") {
+        let mut id = match repo.rev_parse("refs/heads/master") {
             Some(xs) => xs,
             None => return
         };
@@ -68,7 +70,7 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let id = match repo.rev_parse("master") {
+        let id = match repo.rev_parse("refs/heads/master") {
             Some(xs) => xs,
             None => return
         };
@@ -94,7 +96,7 @@ mod tests {
         let repo =
             Repository::from_fs(Path::new("/Users/chris/projects/personal/git-rs/.git"));
 
-        let id = match repo.rev_parse("master") {
+        let id = match repo.rev_parse("refs/heads/master") {
             Some(xs) => xs,
             None => return
         };
