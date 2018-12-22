@@ -1,39 +1,66 @@
-#[derive(Debug)]
-pub struct Store();
+use flate2::bufread::DeflateDecoder;
+use std::io::prelude::*;
+use std::io::{ BufReader, Read, BufRead };
+use std::path::Path;
+use std::fs::File;
 
-impl Store {
-    pub fn new<T>() -> Store {
-        Store {}
+use crate::errors::{ Result, ErrorKind };
+use crate::objects::CanLoad;
+use crate::objects::commit::Commit;
+use crate::objects::blob::Blob;
+use crate::objects::tree::Tree;
+use crate::objects::tag::Tag;
+use crate::objects::Type;
+use crate::id::Id;
+
+pub trait IdToReadable {
+    type Reader;
+
+    fn read(self: &Self, id: &Id) -> Result<Option<Self::Reader>>;
+}
+
+#[derive(Debug)]
+pub struct Store<T: IdToReadable> {
+    reader: T
+}
+
+struct LooseFS {
+    root: Path
+}
+
+impl IdToReadable for LooseFS {
+    type Reader = std::fs::File;
+
+    fn read(&self, id: &Id) -> Result<Option<Self::Reader>> {
+        let as_str = id.to_string();
+        let mut pb = self.root.to_path_buf();
+        pb.push(as_str[0..2].to_string());
+        pb.push(as_str[2..40].to_string());
+        match File::open(pb.as_path()) {
+            Ok(f) => Ok(Some(f)),
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::NotFound => return Ok(None),
+                    _ => return Err(e)?
+                }
+            }
+        }
     }
 }
 
-impl Queryable for Store {
-    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<Type>, GitError> {
+impl<T: IdToReadable> Store<T> where T::Reader : Read {
+    fn get(&self, id: &Id) -> Result<Option<Type>> {
+        let maybe_reader = self.reader.read(id)?;
+        if maybe_reader.is_none() {
+            return Ok(None)
+        }
 
-        let bytes: &[u8; 20] = id.as_slice();
-        let first = hex::encode(&bytes[0..1]);
-        let rest = hex::encode(&bytes[1..20]);
-        let mut pb = repo.path().to_path_buf();
-        pb.push("objects");
-        pb.push(first);
-        pb.push(rest);
-
-        let file = match File::open(pb.as_path()) {
-            Ok(f) => f,
-            Err(e) => {
-                match e.kind() {
-                    io::ErrorKind::NotFound => return Ok(None),
-                    _ => return Err(GitError::Unknown)
-                }
-            }
-        };
-
-        let buffered_file = BufReader::new(file);
-        let mut sig_handle = buffered_file.take(2);
+        let reader = BufReader::new(maybe_reader.unwrap());
+        let mut sig_handle = reader.take(2);
         let mut sig_bytes = [0u8; 2];
         match sig_handle.read(&mut sig_bytes) {
             Err(e) => {
-                return Err(GitError::Unknown)
+                return Err(ErrorKind::BadLooseObject.into())
             },
             Ok(_) => {}
         };
@@ -41,18 +68,20 @@ impl Queryable for Store {
         let w1 = sig_bytes[1] as u16;
         let word = (w0 << 8) + w1;
 
-        let file_after_sig = sig_handle.into_inner();
+        let mut file_after_sig = sig_handle.into_inner();
 
         // !!! next step is:
         // check to see is_zlib = w0 === 0x78 && !(word % 31)
         // then "commit" | "tree" | "blob" | "tag" SP SIZE NUL body
         let is_deflate = w0 == 0x78 && ((word & 31) != 0);
-        let decoder_handle: Box<std::io::Read> = if is_deflate {
-            Box::new(DeflateDecoder::new(file_after_sig))
+        return if is_deflate {
+            self.inner_read(&mut DeflateDecoder::new(file_after_sig))
         } else {
-            Box::new(file_after_sig)
-        };
+            self.inner_read(&mut file_after_sig)
+        }
+    }
 
+    fn inner_read<S: Read>(&self, decoder_handle: &mut S) -> Result<Option<Type>> {
         let mut type_vec = Vec::new();
         let mut size_vec = Vec::new();
         enum Mode {
@@ -65,10 +94,7 @@ impl Queryable for Store {
         loop {
             let mut next_handle = header_handle.take(1);
             let mut header_byte = [0u8; 1];
-            match next_handle.read(&mut header_byte) {
-                Err(e) => return Err(GitError::Unknown),
-                Ok(_) => {}
-            };
+            next_handle.read(&mut header_byte)?;
             let next = match mode {
                 Mode::FindSpace => {
                     match header_byte[0] {
@@ -98,19 +124,28 @@ impl Queryable for Store {
             header_handle = next_handle.into_inner();
         }
 
-        let typename = match str::from_utf8(&type_vec) {
-            Ok(xs) => xs,
-            Err(e) => return Err(GitError::Unknown)
-        };
+        let typename = std::str::from_utf8(&type_vec)?;
         let body_handle = header_handle;
 
-        match typename {
-            "commit" => Ok(Some(Type::Commit(body_handle))),
-            "blob" => Ok(Some(Type::Blob(body_handle))),
-            "tree" => Ok(Some(Type::Tree(body_handle))),
-            "tag" => Ok(Some(Type::Tag(body_handle))),
-            &_ => Err(GitError::Unknown)
-        }
+        let loaded_type = match typename {
+            "commit" => Commit::load(body_handle),
+            // "blob" => Blob::load(body_handle),
+            "tree" => Tree::load(body_handle),
+            "tag" => Tag::load(body_handle),
+            &_ => return Err(ErrorKind::BadLooseObject.into())
+        }?;
+
+        Ok(Some(loaded_type))
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::objects::CanLoad;
+    use crate::id::Id;
+    use crate::objects::tree::FileMode;
+
+    #[test]
+    fn tree_read_works() {
+    }
+}

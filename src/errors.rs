@@ -4,4 +4,8 @@ error_chain! {
         Encoding(::std::str::Utf8Error);
         BadMode(::std::num::ParseIntError);
     }
+
+    errors {
+        BadLooseObject
+    }
 }

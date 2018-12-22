@@ -3,6 +3,7 @@ extern crate error_chain;
 
 pub mod id;
 pub mod errors;
+pub mod stores;
 pub mod objects;
 
 #[cfg(test)]

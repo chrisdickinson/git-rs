@@ -6,7 +6,7 @@ pub mod blob;
 pub mod tree;
 pub mod tag;
 
-trait CanLoad {
+pub trait CanLoad {
     fn load<T: std::io::Read>(handle: &mut T) -> Result<Type>;
 }
 
