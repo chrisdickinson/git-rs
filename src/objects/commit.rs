@@ -11,6 +11,12 @@ pub struct Commit {
     message: Vec<u8>
 }
 
+impl Commit {
+    pub fn message(&self) -> &[u8] {
+        self.message.as_slice()
+    }
+}
+
 impl CanLoad for Commit {
     fn load<T: std::io::Read>(handle: &mut T) -> Result<Type> {
         // attr SP value NL

@@ -142,10 +142,42 @@ impl<T: IdToReadable> Store<T> where T::Reader : Read {
 #[cfg(test)]
 mod tests {
     use crate::objects::CanLoad;
+    use crate::objects::Type;
     use crate::id::Id;
     use crate::objects::tree::FileMode;
 
+    use super::{ IdToReadable, Store, Result };
+
+    struct FakeFS<'a> {
+        bytes: &'a [u8]
+    }
+
+    impl<'a> IdToReadable for FakeFS<'a> {
+        type Reader = &'a [u8];
+
+        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
+            Ok(Some(self.bytes))
+        }
+    }
+
     #[test]
-    fn tree_read_works() {
+    fn read_commit_works() {
+        let store = Store {
+            reader: FakeFS {
+                bytes: include_bytes!("../../fixtures/loose_commit")
+            }
+        };
+
+        let option = store.get(&Id::default()).expect("it exploded");
+        if let Some(xs) = option {
+            if let Type::Commit(commit) = xs {
+                let message = std::str::from_utf8(commit.message()).expect("not utf8");
+                assert_eq!(message, "maybe implement loose store\n");
+            } else {
+                panic!("expected commit");
+            }
+        } else {
+            panic!("explode");
+        }
     }
 }
