@@ -1,0 +1,9 @@
+[package]
+name = "git-rs"
+version = "0.1.0"
+authors = ["Chris Dickinson <christopher.s.dickinson@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+hex = "0.3.2"
+error-chain = "0.12.0"
