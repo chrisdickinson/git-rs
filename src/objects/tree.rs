@@ -17,6 +17,12 @@ pub struct Tree {
     entries: HashMap<Vec<u8>, TreeEntry>
 }
 
+impl Tree {
+    pub fn entries (&self) -> &HashMap<Vec<u8>, TreeEntry> {
+        &self.entries
+    }
+}
+
 impl CanLoad for Tree {
     fn load<T: std::io::Read>(handle: &mut T) -> Result<Type> {
         let mut vec = Vec::new();

@@ -146,7 +146,7 @@ mod tests {
     use crate::id::Id;
     use crate::objects::tree::FileMode;
 
-    use super::{ IdToReadable, Store, Result };
+    use super::{ IdToReadable, Store, Result, ErrorKind };
 
     struct FakeFS<'a> {
         bytes: &'a [u8]
@@ -179,5 +179,73 @@ mod tests {
         } else {
             panic!("explode");
         }
+    }
+
+    #[test]
+    fn read_tree_works() {
+        let store = Store {
+            reader: FakeFS {
+                bytes: include_bytes!("../../fixtures/loose_tree")
+            }
+        };
+
+        let option = store.get(&Id::default()).expect("it exploded");
+        if let Some(xs) = option {
+            if let Type::Tree(tree) = xs {
+                let mut entries: Vec<&str> = tree.entries().keys()
+                    .map(|xs| ::std::str::from_utf8(xs).expect("valid utf8"))
+                    .collect();
+                entries.sort();
+                assert_eq!(entries.join("\n"), ".gitignore\nCargo.toml\nREADME.md\nfixtures\nsrc");
+            } else {
+                panic!("expected tree");
+            }
+        } else {
+            panic!("explode");
+        }
+    }
+
+    struct FailFS;
+
+    impl IdToReadable for FailFS {
+        type Reader = std::fs::File;
+
+        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
+            Err(ErrorKind::BadLooseObject.into())
+        }
+    }
+
+    #[test]
+    fn handles_idtoreadable_failures() {
+        let store = Store {
+            reader: FailFS { }
+        };
+
+        match store.get(&Id::default()) {
+            Ok(_) => panic!("expected failure!"),
+            Err(e) => assert_eq!(e.description(), "BadLooseObject")
+        };
+    }
+
+    struct MissingFS;
+
+    impl IdToReadable for MissingFS {
+        type Reader = std::fs::File;
+
+        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn handles_idtoreadable_misses() {
+        let store = Store {
+            reader: MissingFS { }
+        };
+
+        match store.get(&Id::default()) {
+            Err(_) => panic!("expected success!"),
+            Ok(xs) => assert!(xs.is_none())
+        };
     }
 }
