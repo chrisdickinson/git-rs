@@ -5,6 +5,7 @@ pub mod id;
 pub mod errors;
 pub mod stores;
 pub mod objects;
+pub mod packindex;
 
 #[cfg(test)]
 mod tests {
