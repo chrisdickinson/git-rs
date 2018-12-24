@@ -7,5 +7,6 @@ error_chain! {
 
     errors {
         BadLooseObject
+        NotImplemented
     }
 }

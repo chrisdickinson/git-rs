@@ -11,8 +11,8 @@ pub trait CanLoad {
 }
 
 pub enum Type {
-    Commit(crate::objects::commit::Commit),
-    Tree(crate::objects::tree::Tree),
-    Blob(self::blob::Blob),
-    Tag(self::tag::Tag)
+    Commit(Box<std::io::Read>),
+    Tree(Box<std::io::Read>),
+    Blob(Box<std::io::Read>),
+    Tag(Box<std::io::Read>)
 }

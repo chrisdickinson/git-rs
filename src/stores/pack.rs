@@ -2,7 +2,6 @@ use flate2::bufread::DeflateDecoder;
 use std::io::{BufReader, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
-use stores::Queryable;
 use packindex::Index;
 use error::GitError;
 use std::fs::File;
@@ -10,12 +9,17 @@ use id::Id;
 use std;
 
 use delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
-use repository::Repository;
 use objects::Type;
 
+pub trait ToReadable {
+    type Reader;
+
+    fn read(&self) -> Result<Reader>;
+}
+
 #[derive(Debug)]
-pub struct Store {
-    packfile_path: PathBuf,
+pub struct Store<T: ToReadable> {
+    reader: T,
     index: Index
 }
 // pack format is:
@@ -25,21 +29,26 @@ pub struct Store {
 //      4 byte object count (N)
 //      N objects
 //      20 byte checksum
-impl Store {
-    pub fn new(index_path: &Path, packfile_path: &Path) -> Result<Store, GitError> {
-        let file = File::open(index_path)?;
-        let buffered_file = BufReader::new(file);
-        let index = Index::from(Box::new(buffered_file))?;
+impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
+    pub fn new(reader: T, idx: Option<Index>) -> Result<Store<T>> {
+        let index = match idx {
+            Some(i) => i,
+            None => Store::build_index(&reader)?
+        };
 
         Ok(Store {
-            packfile_path: PathBuf::from(packfile_path),
+            reader: reader,
             index: index
         })
     }
 
-    pub fn read_bounds (&self, start: u64, end: u64, repository: &Repository) -> Result<(u8, Box<std::io::Read>), GitError> {
-        let file = File::open(&self.packfile_path)?;
-        let mut buffered_file = BufReader::new(file);
+    pub fn build_index (reader: &reader) -> Result<Index> {
+        Err(ErrorKind::NotImplemented.into())
+    }
+
+    pub fn read_bounds (&self, start: u64, end: u64) -> Result<(u8, Box<std::io::Read>)> {
+        let handle = self.reader.read()?;
+        let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
         let stream = buffered_file.take(end - start);
 
@@ -111,7 +120,7 @@ impl Store {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions);
 
-                let (base_type, stream) = match self.read_bounds(start - offset, start, repository) {
+                let (base_type, stream) = match self.read_bounds(start - offset, start) {
                     Ok(xs) => xs,
                     Err(e) => return Err(e)
                 };
@@ -144,15 +153,13 @@ impl Store {
             }
         }
     }
-}
 
-impl Queryable for Store {
-    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<Type>, GitError> {
+    fn get(&self, id: &Id) -> Result<Option<Type>, GitError> {
         let (start, end) = match self.index.get_bounds(&id) {
             Some(xs) => xs,
             None => return Ok(None)
         };
-        let (t, stream) = self.read_bounds(start, end, repo)?;
+        let (t, stream) = self.read_bounds(start, end)?;
         match t {
             1 => Ok(Some(Type::Commit(stream))),
             2 => Ok(Some(Type::Tree(stream))),

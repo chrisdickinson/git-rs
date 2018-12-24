@@ -24,7 +24,7 @@ pub struct Store<T: IdToReadable> {
     reader: T
 }
 
-struct LooseFS {
+pub struct LooseFS {
     root: Path
 }
 

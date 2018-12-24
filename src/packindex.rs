@@ -25,10 +25,10 @@ use crate::errors::Result;
 //      20 byte packfile shasum
 //      20 byte shasum of preceding contents
 #[derive(Debug)]
-struct IndexEntry {
-    pub id: Id,
-    pub offset: u64,
-    pub crc32: u32
+pub struct IndexEntry {
+    id: Id,
+    offset: u64,
+    crc32: u32
 }
 
 struct Fanout ([u32; 256]);
@@ -48,7 +48,11 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn from<T: std::io::Read> (mut stream: T) -> Result<Index> {
+    pub fn objects(&self) -> &[IndexEntry] {
+        self.objects.as_slice()
+    }
+
+    pub fn from<T: std::io::Read>(mut stream: T) -> Result<Index> {
         let mut magic = [0u8; 4];
         stream.read_exact(&mut magic)?;
         let mut version = [0u8; 4];
@@ -158,3 +162,21 @@ impl Index {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::Index;
+
+    #[test]
+    fn can_load() {
+        let bytes = include_bytes!("../fixtures/pack_index");
+
+        let idx = Index::from(&mut bytes.as_ref()).expect("bad index");
+
+        let ids: Vec<String> = idx.objects().iter().take(4).map(|xs| xs.id.to_string()).collect();
+
+        assert_eq!(ids, vec!["001ee96da518fde304f75084ba5bc07d07e3c881", "019cf3a6bcacb5ab5698365d85458da79c18d665", "01db6e575b4d393bdbafe694e0a818d5b0bd9777", "01fd6a3ade703423b93cd57143dcd5bd5244d326"]);
+
+        let offsets: Vec<u64> = idx.objects().iter().take(4).map(|xs| xs.offset).collect();
+        assert_eq!(offsets, vec![62559, 64144, 47049, 50501]);
+    }
+}

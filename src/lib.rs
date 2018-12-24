@@ -2,6 +2,7 @@
 extern crate error_chain;
 
 pub mod id;
+pub mod delta;
 pub mod errors;
 pub mod stores;
 pub mod objects;
