@@ -1,56 +1,54 @@
 use flate2::bufread::DeflateDecoder;
 use std::io::prelude::*;
-use std::io::{ BufReader, Read, BufRead };
+use std::io::{ BufReader };
 use std::path::Path;
 use std::fs::File;
 
+use std::borrow::BorrowMut;
 use crate::errors::{ Result, ErrorKind };
-use crate::objects::CanLoad;
 use crate::objects::commit::Commit;
 use crate::objects::blob::Blob;
 use crate::objects::tree::Tree;
 use crate::objects::tag::Tag;
-use crate::objects::Type;
+use crate::objects::{ Type, Object };
 use crate::id::Id;
 
-pub trait IdToReadable {
-    type Reader;
-
-    fn read(self: &Self, id: &Id) -> Result<Option<Self::Reader>>;
+pub struct Store {
+    read: Box<Fn(&Id) -> Result<Option<Box<std::io::Read>>>>
 }
 
-#[derive(Debug)]
-pub struct Store<T: IdToReadable> {
-    reader: T
-}
+// pub struct LooseFS {
+//     root: Path
+// }
+// 
+// impl LooseFS {
+//     fn read(&self, id: &Id) -> Result<Option<Self::Reader>> {
+//         let as_str = id.to_string();
+//         let mut pb = self.root.to_path_buf();
+//         pb.push(as_str[0..2].to_string());
+//         pb.push(as_str[2..40].to_string());
+//         match File::open(pb.as_path()) {
+//             Ok(f) => Ok(Some(f)),
+//             Err(e) => {
+//                 match e.kind() {
+//                     std::io::ErrorKind::NotFound => return Ok(None),
+//                     _ => return Err(e)?
+//                 }
+//             }
+//         }
+//     }
+// }
 
-pub struct LooseFS {
-    root: Path
-}
-
-impl IdToReadable for LooseFS {
-    type Reader = std::fs::File;
-
-    fn read(&self, id: &Id) -> Result<Option<Self::Reader>> {
-        let as_str = id.to_string();
-        let mut pb = self.root.to_path_buf();
-        pb.push(as_str[0..2].to_string());
-        pb.push(as_str[2..40].to_string());
-        match File::open(pb.as_path()) {
-            Ok(f) => Ok(Some(f)),
-            Err(e) => {
-                match e.kind() {
-                    std::io::ErrorKind::NotFound => return Ok(None),
-                    _ => return Err(e)?
-                }
-            }
+impl Store {
+    pub fn new<C>(func: C) -> Self
+        where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static {
+        Store {
+            read: Box::new(func)
         }
     }
-}
 
-impl<T: IdToReadable> Store<T> where T::Reader : Read {
-    fn get(&self, id: &Id) -> Result<Option<Type>> {
-        let maybe_reader = self.reader.read(id)?;
+    fn get(&self, id: &Id) -> Result<Option<(Type, Box<std::io::Read>)>> {
+        let maybe_reader = (self.read)(id)?;
         if maybe_reader.is_none() {
             return Ok(None)
         }
@@ -58,12 +56,9 @@ impl<T: IdToReadable> Store<T> where T::Reader : Read {
         let reader = BufReader::new(maybe_reader.unwrap());
         let mut sig_handle = reader.take(2);
         let mut sig_bytes = [0u8; 2];
-        match sig_handle.read(&mut sig_bytes) {
-            Err(e) => {
-                return Err(ErrorKind::BadLooseObject.into())
-            },
-            Ok(_) => {}
-        };
+
+        sig_handle.read(&mut sig_bytes)?;
+
         let w0 = sig_bytes[0] as u16;
         let w1 = sig_bytes[1] as u16;
         let word = (w0 << 8) + w1;
@@ -74,14 +69,12 @@ impl<T: IdToReadable> Store<T> where T::Reader : Read {
         // check to see is_zlib = w0 === 0x78 && !(word % 31)
         // then "commit" | "tree" | "blob" | "tag" SP SIZE NUL body
         let is_deflate = w0 == 0x78 && ((word & 31) != 0);
-        return if is_deflate {
-            self.inner_read(&mut DeflateDecoder::new(file_after_sig))
+        let decoder_handle: Box<std::io::Read> = if is_deflate {
+            Box::new(DeflateDecoder::new(file_after_sig))
         } else {
-            self.inner_read(&mut file_after_sig)
-        }
-    }
+            Box::new(file_after_sig)
+        };
 
-    fn inner_read<S: Read>(&self, decoder_handle: &mut S) -> Result<Option<Type>> {
         let mut type_vec = Vec::new();
         let mut size_vec = Vec::new();
         enum Mode {
@@ -92,9 +85,11 @@ impl<T: IdToReadable> Store<T> where T::Reader : Read {
 
         let mut header_handle = decoder_handle;
         loop {
+            // XXX(chrisdickinson): how long should we loop for until we give up?
             let mut next_handle = header_handle.take(1);
             let mut header_byte = [0u8; 1];
             next_handle.read(&mut header_byte)?;
+
             let next = match mode {
                 Mode::FindSpace => {
                     match header_byte[0] {
@@ -123,54 +118,38 @@ impl<T: IdToReadable> Store<T> where T::Reader : Read {
             mode = next;
             header_handle = next_handle.into_inner();
         }
-
+        let output_stream = header_handle;
         let typename = std::str::from_utf8(&type_vec)?;
-        let body_handle = header_handle;
 
         let loaded_type = match typename {
-            "commit" => Commit::load(body_handle),
-            // "blob" => Blob::load(body_handle),
-            "tree" => Tree::load(body_handle),
-            "tag" => Tag::load(body_handle),
+            "commit" => Type::Commit,
+            "blob" => Type::Blob,
+            "tree" => Type::Tree,
+            "tag" => Type::Tag,
             &_ => return Err(ErrorKind::BadLooseObject.into())
-        }?;
+        };
 
-        Ok(Some(loaded_type))
+        Ok(Some((loaded_type, output_stream)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::CanLoad;
-    use crate::objects::Type;
-    use crate::id::Id;
+    use crate::objects::{ Type, Object };
     use crate::objects::tree::FileMode;
+    use crate::id::Id;
 
-    use super::{ IdToReadable, Store, Result, ErrorKind };
-
-    struct FakeFS<'a> {
-        bytes: &'a [u8]
-    }
-
-    impl<'a> IdToReadable for FakeFS<'a> {
-        type Reader = &'a [u8];
-
-        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
-            Ok(Some(self.bytes))
-        }
-    }
+    use super::{ Store, Result, ErrorKind };
 
     #[test]
     fn read_commit_works() {
-        let store = Store {
-            reader: FakeFS {
-                bytes: include_bytes!("../../fixtures/loose_commit")
-            }
-        };
+        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_commit") as &[u8]))));
 
         let option = store.get(&Id::default()).expect("it exploded");
-        if let Some(xs) = option {
-            if let Type::Commit(commit) = xs {
+        if let Some((xs, mut stream)) = option {
+            let object = xs.load(&mut stream).expect("failed to load");
+
+            if let Object::Commit(commit) = object {
                 let message = std::str::from_utf8(commit.message()).expect("not utf8");
                 assert_eq!(message, "maybe implement loose store\n");
             } else {
@@ -183,15 +162,13 @@ mod tests {
 
     #[test]
     fn read_tree_works() {
-        let store = Store {
-            reader: FakeFS {
-                bytes: include_bytes!("../../fixtures/loose_tree")
-            }
-        };
+        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_tree") as &[u8]))));
 
         let option = store.get(&Id::default()).expect("it exploded");
-        if let Some(xs) = option {
-            if let Type::Tree(tree) = xs {
+        if let Some((xs, mut stream)) = option {
+            let object = xs.load(&mut stream).expect("failed to load");
+
+            if let Object::Tree(tree) = object {
                 let mut entries: Vec<&str> = tree.entries().keys()
                     .map(|xs| ::std::str::from_utf8(xs).expect("valid utf8"))
                     .collect();
@@ -205,21 +182,9 @@ mod tests {
         }
     }
 
-    struct FailFS;
-
-    impl IdToReadable for FailFS {
-        type Reader = std::fs::File;
-
-        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
-            Err(ErrorKind::BadLooseObject.into())
-        }
-    }
-
     #[test]
     fn handles_idtoreadable_failures() {
-        let store = Store {
-            reader: FailFS { }
-        };
+        let store = Store::new(|_| Err(ErrorKind::BadLooseObject.into()));
 
         match store.get(&Id::default()) {
             Ok(_) => panic!("expected failure!"),
@@ -227,21 +192,9 @@ mod tests {
         };
     }
 
-    struct MissingFS;
-
-    impl IdToReadable for MissingFS {
-        type Reader = std::fs::File;
-
-        fn read(&self, _: &Id) -> Result<Option<Self::Reader>> {
-            Ok(None)
-        }
-    }
-
     #[test]
     fn handles_idtoreadable_misses() {
-        let store = Store {
-            reader: MissingFS { }
-        };
+        let store = Store::new(|_| Ok(None));
 
         match store.get(&Id::default()) {
             Err(_) => panic!("expected success!"),

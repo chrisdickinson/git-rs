@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::str;
 
-use crate::objects::{ CanLoad, Type };
 use crate::errors::Result;
 use crate::id::Id;
 
@@ -17,8 +16,8 @@ impl Commit {
     }
 }
 
-impl CanLoad for Commit {
-    fn load<T: std::io::Read>(handle: &mut T) -> Result<Type> {
+impl Commit {
+    pub fn load<T: std::io::Read>(handle: &mut T) -> Result<Commit> {
         // attr SP value NL
         // NL
         // message
@@ -77,26 +76,21 @@ impl CanLoad for Commit {
         }
 
         let message = buf[message_idx..].to_vec();
-        Ok(Type::Commit(Commit {
+
+        Ok(Commit {
             attributes: attributes,
             message: message
-        }))
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::CanLoad;
-
     #[test]
     fn commit_read_works() {
         let bytes = include_bytes!("../../fixtures/commit");
-        let result = super::Commit::load(&mut bytes.as_ref()).expect("oh no");
-        if let super::Type::Commit(commit) = result {
-            let message = std::str::from_utf8(&commit.message).expect("not utf8");
-            assert_eq!(message, "initial commit\n\n");
-        } else {
-            panic!("expected commit!")
-        }
+        let commit = super::Commit::load(&mut bytes.as_ref()).expect("oh no");
+        let message = std::str::from_utf8(&commit.message).expect("not utf8");
+        assert_eq!(message, "initial commit\n\n");
     }
 }
