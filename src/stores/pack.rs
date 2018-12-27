@@ -117,10 +117,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions);
 
-                let (base_type, stream) = match self.read_bounds(start - offset, start, get_object) {
-                    Ok(xs) => xs,
-                    Err(e) => return Err(e)
-                };
+                let (base_type, stream) = self.read_bounds(start - offset, start, get_object)?;
 
                 Ok((base_type, Box::new(DeltaDecoder::new(&instructions, stream))))
             },
@@ -180,6 +177,7 @@ mod tests {
     use super::Store;
     use super::Id;
     use std::io::Cursor;
+    use crate::objects::Object;
 
     #[test]
     fn can_load() {
@@ -189,7 +187,16 @@ mod tests {
         let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
 
         let id = Id::from_str("872e26b3fbebe64a2a85b271fed6916b964b4fde").unwrap();
-        let (kind, stream) = pack.get(&id, &|_| Ok(None)).expect("failure").unwrap();
+        let (kind, mut stream) = pack.get(&id, &|_| Ok(None)).expect("failure").unwrap();
 
+        let obj = kind.load(&mut stream).expect("failed to load object");
+
+        match obj {
+            Object::Commit(commit) => {
+                let msg = std::str::from_utf8(commit.message()).expect("invalid string");
+                assert_eq!(msg, "ok\n");
+            },
+            _ => panic!("expected commit")
+        };
     }
 }
