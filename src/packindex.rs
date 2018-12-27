@@ -174,9 +174,9 @@ mod tests {
 
         let ids: Vec<String> = idx.objects().iter().take(4).map(|xs| xs.id.to_string()).collect();
 
-        assert_eq!(ids, vec!["001ee96da518fde304f75084ba5bc07d07e3c881", "019cf3a6bcacb5ab5698365d85458da79c18d665", "01db6e575b4d393bdbafe694e0a818d5b0bd9777", "01fd6a3ade703423b93cd57143dcd5bd5244d326"]);
+        assert_eq!(ids, vec!["45b983be36b73c0788dc9cbcb76cbb80fc7bb057", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "7f1c6706fbf2edcae73bde0ed0731d01d8f23fe6", "872e26b3fbebe64a2a85b271fed6916b964b4fde"]);
 
         let offsets: Vec<u64> = idx.objects().iter().take(4).map(|xs| xs.offset).collect();
-        assert_eq!(offsets, vec![62559, 64144, 47049, 50501]);
+        assert_eq!(offsets, vec![264, 318, 169, 12]);
     }
 }

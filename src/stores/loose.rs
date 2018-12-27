@@ -47,7 +47,7 @@ impl Store {
         }
     }
 
-    fn get(&self, id: &Id) -> Result<Option<(Type, Box<std::io::Read>)>> {
+    pub fn get(&self, id: &Id) -> Result<Option<(Type, Box<std::io::Read>)>> {
         let maybe_reader = (self.read)(id)?;
         if maybe_reader.is_none() {
             return Ok(None)

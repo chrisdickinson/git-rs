@@ -2,26 +2,22 @@ use flate2::bufread::DeflateDecoder;
 use std::io::{BufReader, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
-use packindex::Index;
-use error::GitError;
 use std::fs::File;
-use id::Id;
 use std;
 
-use delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
-use objects::Type;
+use crate::delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
+use crate::errors::{Result, ErrorKind};
+use crate::packindex::Index;
+use crate::objects::Type;
+use crate::id::Id;
 
-pub trait ToReadable {
-    type Reader;
+type GetObject = Fn(&Id) -> Result<Option<(Type, Box<std::io::Read>)>>;
 
-    fn read(&self) -> Result<Reader>;
-}
-
-#[derive(Debug)]
-pub struct Store<T: ToReadable> {
-    reader: T,
+pub struct Store<R> {
+    read: Box<Fn() -> Result<R>>,
     index: Index
 }
+
 // pack format is:
 //
 //      4 byte magic number ('P', 'A', 'C', 'K')
@@ -29,25 +25,28 @@ pub struct Store<T: ToReadable> {
 //      4 byte object count (N)
 //      N objects
 //      20 byte checksum
-impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
-    pub fn new(reader: T, idx: Option<Index>) -> Result<Store<T>> {
-        let index = match idx {
-            Some(i) => i,
-            None => Store::build_index(&reader)?
+
+fn build_index(reader: Box<std::io::Read>) -> Result<Index> {
+    Err(ErrorKind::NotImplemented.into())
+}
+
+impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
+    pub fn new<C>(func: C, index: Option<Index>) -> Result<Self>
+        where C: Fn() -> Result<R> + 'static {
+
+        let idx = match index {
+            Some(xs) => xs,
+            None => build_index(Box::new(func()?))?
         };
 
         Ok(Store {
-            reader: reader,
-            index: index
+            read: Box::new(func),
+            index: idx
         })
     }
 
-    pub fn build_index (reader: &reader) -> Result<Index> {
-        Err(ErrorKind::NotImplemented.into())
-    }
-
-    pub fn read_bounds (&self, start: u64, end: u64) -> Result<(u8, Box<std::io::Read>)> {
-        let handle = self.reader.read()?;
+    pub fn read_bounds (&self, start: u64, end: u64, get_object: &GetObject) -> Result<(u8, Box<std::io::Read>)> {
+        let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
         let stream = buffered_file.take(end - start);
@@ -80,19 +79,17 @@ impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
         let count = size_vec.len();
         let mut size = match size_vec.pop() {
             Some(xs) => xs as u64,
-            None => return Err(GitError::Unknown)
+            None => return Err(ErrorKind::CorruptedPackfile.into())
         };
         while size_vec.len() > 0 {
             let next = match size_vec.pop() {
                 Some(xs) => xs as u64,
-                None => return Err(GitError::Unknown)
+                None => return Err(ErrorKind::CorruptedPackfile.into())
             };
             size |= next << (4 + 7 * (count - size_vec.len()));
         }
 
         match type_flag {
-            _ => Err(GitError::Unknown),
-
             0...4 => {
                 let mut zlib_header = [0u8; 2];
                 object_stream.read_exact(&mut zlib_header)?;
@@ -120,7 +117,7 @@ impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions);
 
-                let (base_type, stream) = match self.read_bounds(start - offset, start) {
+                let (base_type, stream) = match self.read_bounds(start - offset, start, get_object) {
                     Ok(xs) => xs,
                     Err(e) => return Err(e)
                 };
@@ -131,7 +128,7 @@ impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
             REF_DELTA => {
                 let mut ref_bytes = [0u8; 20];
                 object_stream.read_exact(&mut ref_bytes)?;
-                let id = Id::from_bytes(&ref_bytes);
+                let id = Id::from(&ref_bytes);
 
                 let mut zlib_header = [0u8; 2];
                 object_stream.read_exact(&mut zlib_header)?;
@@ -139,33 +136,60 @@ impl<T: Store> Store where T::Reader : std::io::Seek + std::io::Read {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions);
 
-                let (t, base_stream) = match repository.get_object(&id)? {
-                    Some(xs) => match xs {
-                        Type::Commit(stream) => (1, stream),
-                        Type::Tree(stream) => (2, stream),
-                        Type::Blob(stream) => (3, stream),
-                        Type::Tag(stream) => (4, stream)
+                let (t, base_stream) = match get_object(&id)? {
+                    Some((xs, stream)) => match xs {
+                        Type::Commit => (1, stream),
+                        Type::Tree => (2, stream),
+                        Type::Blob => (3, stream),
+                        Type::Tag => (4, stream)
                     },
-                    None => return Err(GitError::Unknown)
+                    None => return Err(ErrorKind::CorruptedPackfile.into())
                 };
 
                 Ok((t, Box::new(DeltaDecoder::new(&instructions, base_stream))))
+            },
+
+            _ => {
+                return Err(ErrorKind::BadLooseObject.into())
             }
         }
     }
 
-    fn get(&self, id: &Id) -> Result<Option<Type>, GitError> {
+    fn get(&self, id: &Id, get_object: &GetObject) -> Result<Option<(Type, Box<std::io::Read>)>> {
         let (start, end) = match self.index.get_bounds(&id) {
             Some(xs) => xs,
             None => return Ok(None)
         };
-        let (t, stream) = self.read_bounds(start, end)?;
-        match t {
-            1 => Ok(Some(Type::Commit(stream))),
-            2 => Ok(Some(Type::Tree(stream))),
-            3 => Ok(Some(Type::Blob(stream))),
-            4 => Ok(Some(Type::Tag(stream))),
-            _ => Err(GitError::Unknown)
-        }
+        let (t, stream) = self.read_bounds(start, end, get_object)?;
+        let typed = match t {
+            1 => Type::Commit,
+            2 => Type::Tree,
+            3 => Type::Blob,
+            4 => Type::Tag,
+            _ => return Err(ErrorKind::CorruptedPackfile.into())
+        };
+
+        Ok(Some((typed, stream)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::Index;
+    use super::Store;
+    use super::Id;
+    use std::io::Cursor;
+
+    #[test]
+    fn can_load() {
+        let bytes = include_bytes!("../../fixtures/pack_index");
+
+        let idx = Index::from(&mut bytes.as_ref()).expect("bad index");
+        let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
+
+        let id = Id::from_str("872e26b3fbebe64a2a85b271fed6916b964b4fde").unwrap();
+        let (kind, stream) = pack.get(&id, &|_| Ok(None)).expect("failure").unwrap();
+
     }
 }
