@@ -1,2 +1,2 @@
-mod loose;
-mod pack;
+pub mod loose;
+pub mod pack;

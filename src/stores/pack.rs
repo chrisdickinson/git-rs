@@ -11,7 +11,7 @@ use crate::packindex::Index;
 use crate::objects::Type;
 use crate::id::Id;
 
-type GetObject = Fn(&Id) -> Result<Option<(Type, Box<std::io::Read>)>>;
+pub type GetObject = Fn(&Id) -> Result<Option<(Type, Box<std::io::Read>)>>;
 
 pub struct Store<R> {
     read: Box<Fn() -> Result<R>>,
@@ -49,6 +49,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
+
         let stream = buffered_file.take(end - start);
 
         // type + size bytes
@@ -162,11 +163,12 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         }
     }
 
-    fn get(&self, id: &Id, get_object: &GetObject) -> Result<Option<(Type, Box<std::io::Read>)>> {
+    pub fn get(&self, id: &Id, get_object: &GetObject) -> Result<Option<(Type, Box<std::io::Read>)>> {
         let (start, end) = match self.index.get_bounds(&id) {
             Some(xs) => xs,
             None => return Ok(None)
         };
+
         let (t, stream) = self.read_bounds(start, end, get_object)?;
         let typed = match t {
             1 => Type::Commit,
