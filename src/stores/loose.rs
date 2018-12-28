@@ -63,7 +63,7 @@ impl Store {
         let w1 = sig_bytes[1] as u16;
         let word = (w0 << 8) + w1;
 
-        let mut file_after_sig = sig_handle.into_inner();
+        let file_after_sig = sig_handle.into_inner();
 
         // !!! next step is:
         // check to see is_zlib = w0 === 0x78 && !(word % 31)

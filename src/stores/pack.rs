@@ -5,7 +5,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std;
 
-use crate::delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
+use crate::delta::{DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA};
 use crate::errors::{Result, ErrorKind};
 use crate::packindex::Index;
 use crate::objects::Type;
@@ -26,7 +26,7 @@ pub struct Store<R> {
 //      N objects
 //      20 byte checksum
 
-fn build_index(reader: Box<std::io::Read>) -> Result<Index> {
+fn build_index(_reader: Box<std::io::Read>) -> Result<Index> {
     Err(ErrorKind::NotImplemented.into())
 }
 
@@ -52,8 +52,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         let stream = buffered_file.take(end - start);
 
         // type + size bytes
-        let mut continuation = 0;
-        let mut type_flag = 0;
+        let mut continuation;
         let mut size_vec = Vec::new();
         let mut byte = [0u8; 1];
 
@@ -61,7 +60,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         take_one.read_exact(&mut byte)?;
         let mut original_stream = take_one.into_inner();
         continuation = byte[0] & 0x80;
-        type_flag = (byte[0] & 0x70) >> 4;
+        let type_flag = (byte[0] & 0x70) >> 4;
         size_vec.push(byte[0] & 0x0f);
         loop {
             if continuation < 1 {
@@ -77,7 +76,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         let mut object_stream = original_stream;
 
         let count = size_vec.len();
-        let mut size = match size_vec.pop() {
+        let mut _size = match size_vec.pop() {
             Some(xs) => xs as u64,
             None => return Err(ErrorKind::CorruptedPackfile.into())
         };
@@ -86,7 +85,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 Some(xs) => xs as u64,
                 None => return Err(ErrorKind::CorruptedPackfile.into())
             };
-            size |= next << (4 + 7 * (count - size_vec.len()));
+            _size |= next << (4 + 7 * (count - size_vec.len()));
         }
 
         match type_flag {
@@ -115,11 +114,15 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 original_stream.read_exact(&mut zlib_header)?;
                 let mut deflate_stream = DeflateDecoder::new(original_stream);
                 let mut instructions = Vec::new();
-                deflate_stream.read_to_end(&mut instructions);
+                deflate_stream.read_to_end(&mut instructions)?;
 
-                let (base_type, stream) = self.read_bounds(start - offset, start, get_object)?;
+                let (base_type, mut stream) = self.read_bounds(start - offset, start, get_object)?;
+                let mut base_buf = Vec::new();
 
-                Ok((base_type, Box::new(DeltaDecoder::new(&instructions, stream))))
+                stream.read_to_end(&mut base_buf)?;
+                let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
+                let dd_stream: DeltaDecoderStream = delta_decoder.into();
+                Ok((base_type, Box::new(dd_stream)))
             },
 
             REF_DELTA => {
@@ -131,9 +134,9 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 object_stream.read_exact(&mut zlib_header)?;
                 let mut deflate_stream = DeflateDecoder::new(object_stream);
                 let mut instructions = Vec::new();
-                deflate_stream.read_to_end(&mut instructions);
+                deflate_stream.read_to_end(&mut instructions)?;
 
-                let (t, base_stream) = match get_object(&id)? {
+                let (t, mut base_stream) = match get_object(&id)? {
                     Some((xs, stream)) => match xs {
                         Type::Commit => (1, stream),
                         Type::Tree => (2, stream),
@@ -143,7 +146,14 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                     None => return Err(ErrorKind::CorruptedPackfile.into())
                 };
 
-                Ok((t, Box::new(DeltaDecoder::new(&instructions, base_stream))))
+                let mut base_buf = Vec::new();
+
+                base_stream.read_to_end(&mut base_buf)?;
+
+
+                let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
+                let stream: DeltaDecoderStream = delta_decoder.into();
+                Ok((t, Box::new(stream)))
             },
 
             _ => {

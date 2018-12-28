@@ -1,0 +1,6 @@
+tree 4ade97c18123c57a50e3b9923d053fd2db4f605f
+parent 77fe18494b4b7ebf0ecca4d0ccf85073fb21bdfb
+author Chris Dickinson <christopher.s.dickinson@gmail.com> 1356654303 -0800
+committer Chris Dickinson <christopher.s.dickinson@gmail.com> 1356654303 -0800
+
+bump version for ci.testling.com

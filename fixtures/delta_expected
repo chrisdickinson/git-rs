@@ -1,0 +1,6 @@
+tree 4ade97c18123c57a50e3b9923d053fd2db4f605f
+parent d25ca25aabf993e8527d7b84aa631891f2eeef48
+author Chris Dickinson <christopher.s.dickinson@gmail.com> 1356069533 -0800
+committer Chris Dickinson <christopher.s.dickinson@gmail.com> 1356069533 -0800
+
+add assert.end() to utils tests

@@ -6,6 +6,8 @@ error_chain! {
     }
 
     errors {
+        TruncatedDeltaOutput
+        BadDeltaBase
         BadLooseObject
         NotImplemented
         CorruptedPackfile
