@@ -1,12 +1,13 @@
+use std::io::{ BufReader, SeekFrom };
 use flate2::bufread::DeflateDecoder;
-use std::io::{BufReader, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::path::{ Path, PathBuf };
 use std::io::prelude::*;
 use std::fs::File;
 use std;
 
-use crate::delta::{DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA};
-use crate::errors::{Result, ErrorKind};
+use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
+use crate::stores::{ Storage, StorageSet };
+use crate::errors::{ Result, ErrorKind };
 use crate::packindex::Index;
 use crate::objects::Type;
 use crate::id::Id;
@@ -45,7 +46,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         })
     }
 
-    pub fn read_bounds (&self, start: u64, end: u64, get_object: &GetObject) -> Result<(u8, Box<std::io::Read>)> {
+    pub fn read_bounds (&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
@@ -117,7 +118,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions)?;
 
-                let (base_type, mut stream) = self.read_bounds(start - offset, start, get_object)?;
+                let (base_type, mut stream) = self.read_bounds(start - offset, start, backends)?;
                 let mut base_buf = Vec::new();
 
                 stream.read_to_end(&mut base_buf)?;
@@ -137,7 +138,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                 let mut instructions = Vec::new();
                 deflate_stream.read_to_end(&mut instructions)?;
 
-                let (t, mut base_stream) = match get_object(&id)? {
+                let (t, mut base_stream) = match backends.get(&id)? {
                     Some((xs, stream)) => match xs {
                         Type::Commit => (1, stream),
                         Type::Tree => (2, stream),
@@ -162,14 +163,17 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
             }
         }
     }
+}
 
-    pub fn get(&self, id: &Id, get_object: &GetObject) -> Result<Option<(Type, Box<std::io::Read>)>> {
+
+impl<R: std::io::Read + std::io::Seek + 'static> Storage for Store<R> {
+    fn get(&self, id: &Id, backends: &StorageSet) -> Result<Option<(Type, Box<std::io::Read>)>> {
         let (start, end) = match self.index.get_bounds(&id) {
             Some(xs) => xs,
             None => return Ok(None)
         };
 
-        let (t, stream) = self.read_bounds(start, end, get_object)?;
+        let (t, stream) = self.read_bounds(start, end, backends)?;
         let typed = match t {
             1 => Type::Commit,
             2 => Type::Tree,

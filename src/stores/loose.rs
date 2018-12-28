@@ -1,16 +1,17 @@
 use flate2::bufread::DeflateDecoder;
+use std::borrow::BorrowMut;
 use std::io::prelude::*;
 use std::io::{ BufReader };
 use std::path::Path;
 use std::fs::File;
 
-use std::borrow::BorrowMut;
+use crate::stores::{ Storage, StorageSet };
 use crate::errors::{ Result, ErrorKind };
+use crate::objects::{ Type, Object };
 use crate::objects::commit::Commit;
 use crate::objects::blob::Blob;
 use crate::objects::tree::Tree;
 use crate::objects::tag::Tag;
-use crate::objects::{ Type, Object };
 use crate::id::Id;
 
 pub struct Store {
@@ -46,8 +47,10 @@ impl Store {
             read: Box::new(func)
         }
     }
+}
 
-    pub fn get(&self, id: &Id) -> Result<Option<(Type, Box<std::io::Read>)>> {
+impl Storage for Store {
+    fn get(&self, id: &Id, _: &StorageSet) -> Result<Option<(Type, Box<std::io::Read>)>> {
         let maybe_reader = (self.read)(id)?;
         if maybe_reader.is_none() {
             return Ok(None)
