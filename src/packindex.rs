@@ -28,7 +28,8 @@ use crate::errors::Result;
 pub struct IndexEntry {
     id: Id,
     offset: u64,
-    crc32: u32
+    crc32: u32,
+    next: usize
 }
 
 struct Fanout ([u32; 256]);
@@ -101,7 +102,8 @@ impl Index {
             entry_vec.push(IndexEntry {
                 id: id,
                 offset: final_offset,
-                crc32: crc_vec[idx]
+                crc32: crc_vec[idx],
+                next: 0
             });
         }
 
@@ -110,6 +112,18 @@ impl Index {
 
         let mut checksum = [0u8; 20];
         stream.read_exact(&mut checksum)?;
+
+        let mut entry_sorted: Vec<(usize, &mut IndexEntry)> = entry_vec.iter_mut().enumerate().collect();
+
+        entry_sorted.sort_by_key(|(_, entry)| {
+            entry.offset
+        });
+
+        let mut idx = 0;
+        while idx < entry_sorted.len() - 1{
+            entry_sorted[idx].1.next = entry_sorted[idx + 1].0;
+            idx += 1;
+        }
 
         Ok(Index {
             fanout: Fanout(fanout),
@@ -146,7 +160,7 @@ impl Index {
                     std::cmp::Ordering::Equal => {
                         return Some((
                             self.objects[middle].offset,
-                            self.objects[middle + 1].offset
+                            self.objects[self.objects[middle].next].offset
                         ));
                     }
                 },
