@@ -14,6 +14,22 @@ impl Commit {
     pub fn message(&self) -> &[u8] {
         self.message.as_slice()
     }
+
+    pub fn parents(&self) -> Option<Vec<Id>> {
+        self.attributes.get(&vec![ 112u8, 97, 114, 101, 110, 116 ]).and_then(|v| {
+            Some(v.iter().map(|id_bytes| {
+                std::str::from_utf8(&id_bytes)
+            }).filter(|results| {
+                results.is_ok()
+            }).map(|xs| {
+                Id::from_str(&xs.unwrap())
+            }).filter(|xs| {
+                xs.is_some()
+            }).map(|xs| {
+                xs.unwrap()
+            }).collect())
+        })
+    }
 }
 
 impl Commit {
