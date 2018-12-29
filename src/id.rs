@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Write;
 use std::iter::FromIterator;
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Debug, Clone)]
+#[derive(Default, PartialEq, Eq, PartialOrd, Debug, Clone, Hash)]
 pub struct Id {
     bytes: [u8; 20]
 }
