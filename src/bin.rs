@@ -34,7 +34,7 @@ pub fn main() -> std::io::Result<()> {
                 let lines: Vec<&str> = message.split("\n").collect();
                 let parents = xs.parents();
 
-                println!("{} {}", id, lines[0]);
+                println!("\x1b[33m{} \x1b[0m{}", id, lines[0]);
 
                 if parents.is_none() {
                     return Ok(());
