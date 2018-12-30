@@ -5,22 +5,26 @@ use std::io::Read;
 
 use crate::id::Id;
 
-#[derive(Copy, Clone)]
-enum Kind {
+#[derive(Copy, Clone, Debug)]
+pub enum Kind {
     Local,
     Remote,
     Tag
 }
 
-enum RefPtr {
+#[derive(Debug)]
+pub enum RefPtr {
     Indirect(String),
     Direct(Id)
 }
 
-struct Ref {
+#[derive(Debug)]
+pub struct Ref {
     kind: Kind,
     ptr: RefPtr
 }
+
+pub struct RefSet(HashMap<String, Ref>);
 
 impl Ref {
     pub fn load(path: &Path, kind: Kind) -> Result<Ref, std::io::Error> {
@@ -33,15 +37,15 @@ impl Ref {
                 return Err(std::io::ErrorKind::InvalidData.into());
             }
 
-            if &contents[0..5] == "ref: " {
+            if &contents[0..16] == "ref: refs/heads/" {
                 return Ok(Ref {
                     kind,
-                    ptr: RefPtr::Indirect(String::from(&contents[6..]))
+                    ptr: RefPtr::Indirect(String::from(contents[16..].trim()))
                 });
             }
 
-            if buffer.len() == 40 {
-                if let Some(id) = Id::from_str(contents) {
+            if buffer.len() >= 40 {
+                if let Some(id) = Id::from_str(&contents[0..40]) {
                     return Ok(Ref {
                         ptr: RefPtr::Direct(id),
                         kind
@@ -53,8 +57,6 @@ impl Ref {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
 }
-
-struct RefSet(HashMap<String, Ref>);
 
 fn recurse_dir<'a>(
     root: &mut PathBuf,
