@@ -2,6 +2,8 @@ use std::fmt;
 use std::fmt::Write;
 use std::iter::FromIterator;
 
+use crate::errors::{ ErrorKind, Error };
+
 #[derive(Default, PartialEq, Eq, PartialOrd, Debug, Clone, Hash)]
 pub struct Id {
     bytes: [u8; 20]
@@ -19,6 +21,33 @@ fn hexencode_byte(inp: u8) -> char {
 impl AsRef<[u8]> for Id {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
+    }
+}
+
+impl std::str::FromStr for Id {
+    type Err = Error;
+
+    fn from_str(target: &str) -> Result<Self, Self::Err> {
+        let trimmed = target.trim();
+        if trimmed.len() != 40 {
+            return Err(ErrorKind::BadId.into())
+        }
+
+        let mut id = Id::default();
+        let mut cursor = 0;
+        for xs in target.bytes() {
+            let incoming = match xs {
+                48 ... 57 => xs - 48,
+                97 ... 102 => xs - 97 + 10,
+                65 ... 70 => xs - 65 + 10,
+                _ => return Err(ErrorKind::BadId.into())
+            };
+            let to_shift = (1 + cursor & 1) << 2;
+            id.bytes[cursor >> 1] |= incoming << to_shift;
+            cursor += 1;
+        }
+
+        Ok(id)
     }
 }
 
@@ -51,26 +80,7 @@ impl Id {
     }
 
     pub fn from_str(target: &str) -> Option<Id> {
-        let trimmed = target.trim();
-        if trimmed.len() != 40 {
-            return None
-        }
-
-        let mut id = Id::default();
-        let mut cursor = 0;
-        for xs in target.bytes() {
-            let incoming = match xs {
-                48 ... 57 => xs - 48,
-                97 ... 102 => xs - 97 + 10,
-                65 ... 70 => xs - 65 + 10,
-                _ => return None
-            };
-            let to_shift = (1 + cursor & 1) << 2;
-            id.bytes[cursor >> 1] |= incoming << to_shift;
-            cursor += 1;
-        }
-
-        Some(id)
+        target.parse().ok()
     }
 }
 

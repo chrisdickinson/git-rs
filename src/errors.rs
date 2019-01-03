@@ -6,6 +6,7 @@ error_chain! {
     }
 
     errors {
+        BadId
         TruncatedDeltaOutput
         BadDeltaBase
         BadLooseObject
