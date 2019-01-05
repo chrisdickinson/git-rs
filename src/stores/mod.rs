@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+
+use crate::walk::commits::CommitIterator;
 use crate::objects::{Type, Object};
 use crate::errors::Result;
 use crate::id::Id;
@@ -30,6 +33,10 @@ impl StorageSet {
         }
 
         Ok(None)
+    }
+
+    pub fn commits(&self, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator {
+        CommitIterator::new(&self, id, seen)
     }
 
     pub fn get_and_load(&self, id: &Id) -> Result<Option<Object>> {
