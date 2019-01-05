@@ -145,7 +145,7 @@ impl Index {
 
         loop {
             middle = ((lo + hi) >> 1) as usize;
-            if middle > self.objects.len() {
+            if middle >= self.objects.len() {
                 return None
             }
 
