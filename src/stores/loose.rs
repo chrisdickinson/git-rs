@@ -138,6 +138,7 @@ impl Storage for Store {
 
 #[cfg(test)]
 mod tests {
+    use crate::stores::{ Storage, StorageSet };
     use crate::objects::{ Type, Object };
     use crate::objects::tree::FileMode;
     use crate::id::Id;
@@ -147,8 +148,9 @@ mod tests {
     #[test]
     fn read_commit_works() {
         let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_commit") as &[u8]))));
+        let storage_set = StorageSet::new(Vec::new());
 
-        let option = store.get(&Id::default()).expect("it exploded");
+        let option = store.get(&Id::default(), &storage_set).expect("it exploded");
         if let Some((xs, mut stream)) = option {
             let object = xs.load(&mut stream).expect("failed to load");
 
@@ -166,8 +168,9 @@ mod tests {
     #[test]
     fn read_tree_works() {
         let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_tree") as &[u8]))));
+        let storage_set = StorageSet::new(Vec::new());
 
-        let option = store.get(&Id::default()).expect("it exploded");
+        let option = store.get(&Id::default(), &storage_set).expect("it exploded");
         if let Some((xs, mut stream)) = option {
             let object = xs.load(&mut stream).expect("failed to load");
 
@@ -188,8 +191,9 @@ mod tests {
     #[test]
     fn handles_idtoreadable_failures() {
         let store = Store::new(|_| Err(ErrorKind::BadLooseObject.into()));
+        let storage_set = StorageSet::new(Vec::new());
 
-        match store.get(&Id::default()) {
+        match store.get(&Id::default(), &storage_set) {
             Ok(_) => panic!("expected failure!"),
             Err(e) => assert_eq!(e.description(), "BadLooseObject")
         };
@@ -198,8 +202,9 @@ mod tests {
     #[test]
     fn handles_idtoreadable_misses() {
         let store = Store::new(|_| Ok(None));
+        let storage_set = StorageSet::new(Vec::new());
 
-        match store.get(&Id::default()) {
+        match store.get(&Id::default(), &storage_set) {
             Err(_) => panic!("expected success!"),
             Ok(xs) => assert!(xs.is_none())
         };

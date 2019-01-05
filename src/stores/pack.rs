@@ -194,6 +194,7 @@ mod tests {
     use super::Id;
     use std::io::Cursor;
     use crate::objects::Object;
+    use crate::stores::{ Storage, StorageSet };
 
     #[test]
     fn can_load() {
@@ -201,9 +202,10 @@ mod tests {
 
         let idx = Index::from(&mut bytes.as_ref()).expect("bad index");
         let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
+        let storage_set = StorageSet::new(Vec::new());
 
         let id = Id::from_str("872e26b3fbebe64a2a85b271fed6916b964b4fde").unwrap();
-        let (kind, mut stream) = pack.get(&id, &|_| Ok(None)).expect("failure").unwrap();
+        let (kind, mut stream) = pack.get(&id, &storage_set).expect("failure").unwrap();
 
         let obj = kind.load(&mut stream).expect("failed to load object");
 
