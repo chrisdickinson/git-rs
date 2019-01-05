@@ -1,12 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{ HashMap, HashSet };
 use std::str;
 
+use crate::identity::Identity;
 use crate::errors::Result;
 use crate::id::Id;
 
 #[derive(Debug)]
 pub struct Commit {
     attributes: HashMap<Vec<u8>, Vec<Vec<u8>>>,
+    committer: Option<Identity>,
+    author: Option<Identity>,
     message: Vec<u8>
 }
 
@@ -15,20 +18,20 @@ impl Commit {
         self.message.as_slice()
     }
 
+    pub fn committer(&self) -> Option<&Identity> {
+        if let Some(ref xs) = self.committer {
+            Some(xs)
+        } else {
+            None
+        }
+    }
+
     pub fn parents(&self) -> Option<Vec<Id>> {
-        self.attributes.get(&vec![ 112u8, 97, 114, 101, 110, 116 ]).and_then(|v| {
-            Some(v.iter().map(|id_bytes| {
-                std::str::from_utf8(&id_bytes)
-            }).filter(|results| {
-                results.is_ok()
-            }).map(|xs| {
-                Id::from_str(&xs.unwrap())
-            }).filter(|xs| {
-                xs.is_some()
-            }).map(|xs| {
-                xs.unwrap()
-            }).collect())
-        })
+        let v = self.attributes.get("parent".as_bytes())?;
+        let result: Vec<Id> = v.iter().filter_map(|id_bytes| {
+            std::str::from_utf8(&id_bytes).ok().and_then(|xs| Id::from_str(xs))
+        }).collect();
+        Some(result)
     }
 }
 
@@ -71,6 +74,7 @@ impl Commit {
                         _ => Mode::Attr
                     }
                 },
+
                 Mode::Value => {
                     match *byte {
                         0x0a => {
@@ -88,14 +92,33 @@ impl Commit {
                     }
                 }
             };
+
             mode = next;
         }
 
         let message = buf[message_idx..].to_vec();
 
+        let committer = attributes.get("committer".as_bytes()).and_then(|xs| {
+            if xs.len() > 0 {
+                Identity::parse(xs[0].as_slice())
+            } else {
+                None
+            }
+        });
+
+        let author = attributes.get("author".as_bytes()).and_then(|xs| {
+            if xs.len() > 0 {
+                Identity::parse(xs[0].as_slice())
+            } else {
+                None
+            }
+        });
+
         Ok(Commit {
             attributes: attributes,
-            message: message
+            message: message,
+            committer,
+            author
         })
     }
 }
