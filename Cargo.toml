@@ -9,6 +9,7 @@ hex = "0.3.2"
 error-chain = "0.12.0"
 flate2 = "1.0.6"
 byteorder = "1.2.7"
+chrono = "0.4.6"
 
 [lib]
 name = "git_rs"
