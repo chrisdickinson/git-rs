@@ -31,38 +31,11 @@ pub fn main() -> std::io::Result<()> {
         }
     };
 
-    loop {
-        let result = match storage_set.get_and_load(&id) {
-            Err(_) => return Err(std::io::ErrorKind::InvalidData.into()),
-            Ok(xs) => xs
-        };
-
-        let object = match result {
-            Some(xs) => xs,
-            None => return Err(std::io::ErrorKind::InvalidData.into())
-        };
-
-        match object {
-            Object::Commit(xs) => {
-                let message = std::str::from_utf8(&xs.message()).expect("not utf8");
-                let lines: Vec<&str> = message.split("\n").collect();
-                let parents = xs.parents();
-
-                println!("\x1b[33m{} \x1b[0m{}", id, lines[0]);
-
-                if parents.is_none() {
-                    return Ok(());
-                }
-
-                let parent_vec = parents.unwrap();
-                if parent_vec.len() < 1 {
-                    return Ok(());
-                }
-                id = parent_vec[0].clone();
-            },
-            _ => {}
-        }
-    }
+    for (id, commit) in storage_set.commits(&id, None) {
+        let message = std::str::from_utf8(&commit.message()).expect("not utf8");
+        let lines: Vec<&str> = message.split("\n").collect();
+        println!("\x1b[33m{} \x1b[0m{}", id, lines[0]);
+    };
 
     Ok(())
 }
