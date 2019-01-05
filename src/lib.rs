@@ -8,6 +8,8 @@ pub mod stores;
 pub mod objects;
 pub mod packindex;
 pub mod refs;
+pub mod walk;
+pub mod identity;
 
 #[cfg(test)]
 mod tests {
