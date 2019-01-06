@@ -1,14 +1,43 @@
-use std::collections::{ HashMap, HashSet };
+use std::collections::{ HashMap, HashSet, BinaryHeap };
 
 use crate::objects::commit::Commit;
 use crate::stores::StorageSet;
 use crate::objects::Object;
 use crate::id::Id;
 
+#[derive(Debug)]
+pub struct IdCommit(Id, Commit);
+
+impl std::cmp::Ord for IdCommit {
+    fn cmp(&self, other: &IdCommit) -> std::cmp::Ordering {
+        if let Some(ref rhs) = self.1.committer() {
+            if let Some(ref lhs) = other.1.committer() {
+                return rhs.at().cmp(lhs.at());
+            }
+        }
+
+        return std::cmp::Ordering::Equal;
+    }
+}
+
+impl std::cmp::PartialOrd for IdCommit {
+    fn partial_cmp(&self, other: &IdCommit) -> Option<std::cmp::Ordering> {
+        return Some(self.cmp(other))
+    }
+}
+
+impl std::cmp::PartialEq for IdCommit {
+    fn eq(&self, other: &IdCommit) -> bool {
+        return self.cmp(other) == std::cmp::Ordering::Equal;
+    }
+}
+
+impl std::cmp::Eq for IdCommit { }
+
 pub struct CommitIterator<'a> {
     storage_set: &'a StorageSet,
     seen: HashSet<Id>,
-    target: Vec<(Id, Commit)>
+    target: BinaryHeap<IdCommit>
 }
 
 impl<'a> CommitIterator<'a> {
@@ -18,15 +47,13 @@ impl<'a> CommitIterator<'a> {
         let first = storage_set.get_and_load(id).ok()
             .unwrap_or(None);
 
-        let target = if let Some(xs) = first {
+        let mut target = BinaryHeap::with_capacity(4);
+
+        if let Some(xs) = first {
             if let Object::Commit(head) = xs {
-                vec![(id.clone(), head)]
-            } else {
-                vec![]
+                target.push(IdCommit(id.clone(), head));
             }
-        } else {
-            vec![]
-        };
+        }
 
         seen.insert(id.clone());
         CommitIterator {
@@ -49,55 +76,29 @@ impl<'a> Iterator for CommitIterator<'a> {
         //          add the remaining parent ids to seen.
         //          push remaining parent commits into the vector.
 
-        if self.target.len() == 0 {
-            return None
-        }
+        let newest = self.target.pop()?;
 
-        let mut newest = &self.target[0].1;
-        let mut newest_idx = 0;
-        for (idx, (ref id, ref commit)) in self.target.iter().enumerate().skip(1) {
-            if let Some(ref rhs) = commit.committer() {
-                if let Some(ref lhs) = newest.committer() {
-                    if lhs.at() < rhs.at() {
-                        newest = commit;
-                        newest_idx = idx;
-                    }
-                }
-            }
-        }
-
-        let options = self.target.iter().map(|(ref id, _)| {
-            id.to_string()
-        }).collect::<Vec<String>>().join(", ");
-
-        let mut parents: Vec<(Id, Commit)> = match newest.parents() {
-            Some(xs) => xs.iter().filter_map(|id| {
-                if self.seen.contains(id) {
+        if let Some(xs) = newest.1.parents() {
+            let mut seen = &mut self.seen;
+            let storage_set = &self.storage_set;
+            let mut parents = xs.iter().filter_map(|id| {
+                if seen.contains(id) {
                     return None
                 }
 
-                if let Object::Commit(commit) = self.storage_set.get_and_load(id).ok()?? {
-                    self.seen.insert(id.clone());
-                    return Some((id.clone(), commit))
+                if let Object::Commit(commit) = storage_set.get_and_load(id).ok()?? {
+                    seen.insert(id.clone());
+                    return Some(IdCommit(id.clone(), commit))
                 } else {
                     return None
                 }
-            }).collect(),
-            None => Vec::new()
-        };
+            });
 
-        if parents.len() > 0 {
-            let idstr = self.target[newest_idx].0.to_string();
-            let first_parent = parents.pop().unwrap();
-            let replaced = std::mem::replace(&mut self.target[newest_idx], first_parent);
-
-            if parents.len() > 0 {
-                self.target.append(&mut parents);
+            for parent in parents {
+                self.target.push(parent);
             }
-
-            return Some(replaced);
-        } else {
-            return Some(self.target.remove(newest_idx))
         }
+
+        return Some((newest.0, newest.1));
     }
 }
