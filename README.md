@@ -6,7 +6,56 @@ This is actually my second stab at it, so big blocks will land in place from my
 first attempt. I'm trying again this year after reading more of "Programming
 Rust" (Blandy, Orendorff).
 
-## 2018-01-02 Update
+## TODO
+
+- [x] Read objects from loose store
+- [x] Read objects from pack store
+    - [x] Read packfile indexes
+    - [x] Read delta'd objects
+    - [ ] Fix interface so we don't need to run `open` for each `read()`
+- [x] Load refs off of disk
+- [x] Parse git signatures ("Identity"'s)
+- [x] Create iterator for walking commit graph
+- [ ] Create iterator for walking trees
+    - [ ] Materialize trees to disk (post gitindex?)
+- [ ] Create index from packfile
+- [ ] Create interface for writing new objects
+- [ ] `.git/index` support
+    - [ ] Read git index cache
+    - [ ] Write git index cache
+- [ ] Create packfile from list of objects (API TKTK)
+- [ ] Network protocol
+    - [ ] receive-pack
+    - [ ] send-pack
+- [ ] Try publishing to crates
+    - [ ] Write documentation
+    - [ ] Use crate in another project
+
+* * *
+
+## PLAN
+
+### 2018-01-06 Update
+
+- I wrote an iterator for commits! The [first cut][ref_6] kept a `Vec` of `(Id, Commit)` around,
+  so we could always pick the most recent "next" commit out of the graph (since commits may have
+  many parents.)
+    - But in finishing up the collections section of "Programming Rust" I noticed that `BinaryHeap`
+      was available, which keeps entries in sorted order. You don't often get to choose the underlying
+      storage mechanism of your collections in JS, so this hadn't occurred to me!
+    - Anyway. I swapped out the `Vec` for a `BinaryHeap` [in this commit][ref_7]. Because this pushes
+      the ordering into an `Ord` impl for a type, this opens up the possibility of using the one iterator
+      definition for multiple different orderings. Neat!
+- Testing against a couple long-lived repo, the results coming out of `git_rs` are exactly the same as
+  `git`!
+    - However, it takes about **twice** the time: **60ms** for `git_rs` where `git` takes **30ms**.
+    - I think I have a lead on this, and it has to do with packfile stores: each read from a packfile
+      opens a new `File` instance.
+- I've added a **TODO** section to keep track of what comes next!
+
+* * *
+
+### 2018-01-02 Update
 
 - I implemented [ref loading][ref_2]. It was a bit of a pain! Translating to and
   from `Path` types took a bit of doing.
@@ -17,7 +66,9 @@ Rust" (Blandy, Orendorff).
 - As a result, I've implemented `FromStr` for `Id`, (hopefully) giving it a
   more idiomatic API -- `let id: Id = str.parse()?`
 
-## 2018-12-27 Update
+* * *
+
+### 2018-12-27 Update
 
 - Rust is feeling more natural. [This chain][ref_0] felt natural to write. I
   was even able to [cross-index a list][ref_1] with only a minimum of fighting
@@ -36,12 +87,16 @@ Rust" (Blandy, Orendorff).
 - Oh! It was pretty easy to add a binary to this lib crate. And now we can `git log`
   other repos!
 
-## 2018-12-21 Update
+* * *
+
+### 2018-12-21 Update
 
 - Decided to focus on moving a bit slower and making sure I have tests for
   primitives this time around.
 - Moved away from my original `Box<Write>` trait object design for object
   instance reading & storage format in favor of generics.
+
+* * *
 
 [ref_0]: https://github.com/chrisdickinson/git-rs/blob/fdbe4ac7c781a5c085777baafbd15655be2eca0b/src/objects/commit.rs#L20-L30
 [ref_1]: https://github.com/chrisdickinson/git-rs/blob/fdbe4ac7c781a5c085777baafbd15655be2eca0b/src/packindex.rs#L116-L126
@@ -49,3 +104,5 @@ Rust" (Blandy, Orendorff).
 [ref_3]: https://rust-lang-nursery.github.io/api-guidelines/
 [ref_4]: https://github.com/mre/idiomatic-rust
 [ref_5]: https://www.youtube.com/playlist?list=PL85XCvVPmGQi3tivxDDF1hrT9qr5hdMBZ
+[ref_6]: https://github.com/chrisdickinson/git-rs/blob/254d97e3d840eded4e5ff5a06b9414ff9396e976/src/walk/commits.rs#L56-L71
+[ref_7]: https://github.com/chrisdickinson/git-rs/commit/f8f4cf5f1430b14d3ef0b298ffa9f2cd880d5c28/src/walk/commits.rs#L40
