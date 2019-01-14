@@ -1,4 +1,3 @@
-#![deny(warnings)]
 use std::fmt;
 use std::fmt::Write;
 use std::iter::FromIterator;
@@ -35,17 +34,15 @@ impl std::str::FromStr for Id {
         }
 
         let mut id = Id::default();
-        let mut cursor = 0;
-        for xs in target.bytes() {
+        for (cursor, xs) in target.bytes().enumerate() {
             let incoming = match xs {
                 48 ... 57 => xs - 48,
                 97 ... 102 => xs - 97 + 10,
                 65 ... 70 => xs - 65 + 10,
                 _ => return Err(ErrorKind::BadId.into())
             };
-            let to_shift = (1 + cursor & 1) << 2;
+            let to_shift = ((1 + cursor) & 1) << 2;
             id.bytes[cursor >> 1] |= incoming << to_shift;
-            cursor += 1;
         }
 
         Ok(id)
@@ -79,14 +76,11 @@ impl Id {
 
         String::from_iter(output)
     }
-
-    pub fn from_str(target: &str) -> Option<Id> {
-        target.parse().ok()
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     #[test]
     fn id_default_works() {
         let hash : String = super::Id::default().to_string();
@@ -109,28 +103,28 @@ mod tests {
 
     #[test]
     fn id_fails_on_bad_length() {
-        let result = super::Id::from_str("012345");
+        let result = super::Id::from_str("012345").ok();
         assert_eq!(result, None);
     }
 
     #[test]
     fn id_fails_on_bad_chars() {
-        let oob_g = super::Id::from_str("0123456789abcdefg00000000000000000000000");
+        let oob_g = super::Id::from_str("0123456789abcdefg00000000000000000000000").ok();
         assert_eq!(oob_g, None);
 
-        let oob_g_upper = super::Id::from_str("0123456789abcdefG00000000000000000000000");
+        let oob_g_upper = super::Id::from_str("0123456789abcdefG00000000000000000000000").ok();
         assert_eq!(oob_g_upper, None);
 
-        let oob_colon = super::Id::from_str("0123456789abcdef:00000000000000000000000");
+        let oob_colon = super::Id::from_str("0123456789abcdef:00000000000000000000000").ok();
         assert_eq!(oob_colon, None);
 
-        let oob_grave = super::Id::from_str("0123456789abcdef`00000000000000000000000");
+        let oob_grave = super::Id::from_str("0123456789abcdef`00000000000000000000000").ok();
         assert_eq!(oob_grave, None);
 
-        let oob_slash = super::Id::from_str("0123456789abcdef/00000000000000000000000");
+        let oob_slash = super::Id::from_str("0123456789abcdef/00000000000000000000000").ok();
         assert_eq!(oob_slash, None);
 
-        let oob_at = super::Id::from_str("0123456789abcdef@00000000000000000000000");
+        let oob_at = super::Id::from_str("0123456789abcdef@00000000000000000000000").ok();
         assert_eq!(oob_at, None);
     }
 }

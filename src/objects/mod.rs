@@ -24,19 +24,19 @@ impl Type {
         match &self {
             Type::Commit => {
                 let xs = commit::Commit::load(stream)?;
-                return Ok(Object::Commit(xs));
+                Ok(Object::Commit(xs))
             },
             Type::Tree => {
                 let xs = tree::Tree::load(stream)?;
-                return Ok(Object::Tree(xs));
+                Ok(Object::Tree(xs))
             },
             Type::Tag => {
                 let xs = tag::Tag::load(stream)?;
-                return Ok(Object::Tag(xs));
+                Ok(Object::Tag(xs))
             },
             Type::Blob => {
                 let xs = blob::Blob::load(stream)?;
-                return Ok(Object::Blob(xs));
+                Ok(Object::Blob(xs))
             }
         }
     }

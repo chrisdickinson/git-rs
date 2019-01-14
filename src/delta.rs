@@ -48,7 +48,7 @@ impl DeltaDecoder {
 
         Ok(DeltaDecoder {
             instructions: Vec::from(&instructions[index..]),
-            output_size: output_size,
+            output_size,
             inner: base
         })
     }
@@ -112,7 +112,7 @@ impl std::io::Read for DeltaDecoderStream {
 
                             for i in 0..4 {
                                 if (cmd & check) != 0 {
-                                    offset |= (self.instructions[self.index] as usize) << 8 * i;
+                                    offset |= (self.instructions[self.index] as usize) << (8 * i);
                                     self.index += 1;
                                 }
                                 check <<= 1;
@@ -120,7 +120,7 @@ impl std::io::Read for DeltaDecoderStream {
 
                             for i in 0..3 {
                                 if (cmd & check) != 0 {
-                                    extent |= (self.instructions[self.index] as usize) << 8 * i;
+                                    extent |= (self.instructions[self.index] as usize) << (8 * i);
                                     self.index += 1;
                                 }
                                 check <<= 1;
@@ -128,11 +128,11 @@ impl std::io::Read for DeltaDecoderStream {
 
                             // read 4 bytes out of delta -> extent
 
-                            extent &= 0x00FFFFFF;
+                            extent &= 0x00FF_FFFF;
                             extent = if extent == 0 { 0x10000 } else { extent };
                             DeltaDecoderState::Copy(CopyState {
-                                offset: offset,
-                                extent: extent
+                                offset,
+                                extent
                             })
                         } else {
                             DeltaDecoderState::Insert(InsertState {
@@ -155,8 +155,8 @@ impl std::io::Read for DeltaDecoderStream {
                         (DeltaDecoderState::NextCommand, false)
                     } else {
                         (DeltaDecoderState::Copy(CopyState {
-                            extent: extent,
-                            offset: offset
+                            extent,
+                            offset
                         }), true)
                     }
                 },
@@ -171,7 +171,7 @@ impl std::io::Read for DeltaDecoderStream {
                         (DeltaDecoderState::NextCommand, false)
                     } else {
                         (DeltaDecoderState::Insert(InsertState {
-                            extent: extent
+                            extent
                         }), true)
                     }
                 }

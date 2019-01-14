@@ -7,8 +7,10 @@ use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::id::Id;
 
+type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>>;
+
 pub struct Store {
-    read: Box<Fn(&Id) -> Result<Option<Box<std::io::Read>>>>
+    read: Box<Reader>
 }
 
 // pub struct LooseFS {
@@ -53,10 +55,10 @@ impl Storage for Store {
         let mut sig_handle = reader.take(2);
         let mut sig_bytes = [0u8; 2];
 
-        sig_handle.read(&mut sig_bytes)?;
+        sig_handle.read_exact(&mut sig_bytes)?;
 
-        let w0 = sig_bytes[0] as u16;
-        let w1 = sig_bytes[1] as u16;
+        let w0 = u16::from(sig_bytes[0]);
+        let w1 = u16::from(sig_bytes[1]);
         let word = (w0 << 8) + w1;
 
         let file_after_sig = sig_handle.into_inner();
@@ -84,7 +86,7 @@ impl Storage for Store {
             // XXX(chrisdickinson): how long should we loop for until we give up?
             let mut next_handle = header_handle.take(1);
             let mut header_byte = [0u8; 1];
-            next_handle.read(&mut header_byte)?;
+            next_handle.read_exact(&mut header_byte)?;
 
             let next = match mode {
                 Mode::FindSpace => {

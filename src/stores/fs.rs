@@ -27,8 +27,8 @@ pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) {
             Ok(f) => Ok(Some(Box::new(f))),
             Err(e) => {
                 match e.kind() {
-                    std::io::ErrorKind::NotFound => return Ok(None),
-                    _ => return Err(e)?
+                    std::io::ErrorKind::NotFound => Ok(None),
+                    _ => Err(e)?
                 }
             }
         }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::fs::File;
 use std::io::Read;
 
@@ -45,7 +46,7 @@ impl Ref {
             }
 
             if buffer.len() >= 40 {
-                if let Some(id) = Id::from_str(&contents[0..40]) {
+                if let Ok(id) = Id::from_str(&contents[0..40]) {
                     return Ok(Ref {
                         ptr: RefPtr::Direct(id),
                         kind
@@ -54,11 +55,11 @@ impl Ref {
             }
         }
 
-        return Err(std::io::ErrorKind::InvalidData.into());
+        Err(std::io::ErrorKind::InvalidData.into())
     }
 }
 
-fn recurse_dir<'a>(
+fn recurse_dir(
     root: &mut PathBuf,
     dirs: &mut Vec<String>,
     map: &mut HashMap<String, Ref>,

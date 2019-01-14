@@ -16,19 +16,19 @@ impl std::cmp::Ord for IdCommit {
             }
         }
 
-        return std::cmp::Ordering::Equal;
+        std::cmp::Ordering::Equal
     }
 }
 
 impl std::cmp::PartialOrd for IdCommit {
     fn partial_cmp(&self, other: &IdCommit) -> Option<std::cmp::Ordering> {
-        return Some(self.cmp(other))
+        Some(self.cmp(other))
     }
 }
 
 impl std::cmp::PartialEq for IdCommit {
     fn eq(&self, other: &IdCommit) -> bool {
-        return self.cmp(other) == std::cmp::Ordering::Equal;
+        self.cmp(other) == std::cmp::Ordering::Equal
     }
 }
 
@@ -42,7 +42,7 @@ pub struct CommitIterator<'a> {
 
 impl<'a> CommitIterator<'a> {
     pub fn new(storage_set: &'a StorageSet, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<'a> {
-        let mut seen = seen.unwrap_or_else(|| HashSet::<Id>::new());
+        let mut seen = seen.unwrap_or_else(HashSet::<Id>::new);
 
         let first = storage_set.get_and_load(id).ok()
             .unwrap_or(None);
@@ -99,6 +99,6 @@ impl<'a> Iterator for CommitIterator<'a> {
             }
         }
 
-        return Some((newest.0, newest.1));
+        Some((newest.0, newest.1))
     }
 }

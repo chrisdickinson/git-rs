@@ -73,9 +73,8 @@ impl Index {
         stream.read_u32_into::<BigEndian>(&mut offsets_vec.as_mut_slice())?;
 
         let mut large_offset_count = 0;
-        for idx in 0..object_count {
-            let offset = offsets_vec[idx];
-            let msb_set = offset & 0x80000000;
+        for offset in offsets_vec.iter() {
+            let msb_set = offset & 0x8000_0000;
             if msb_set > 0 {
                 large_offset_count += 1;
             }
@@ -92,15 +91,15 @@ impl Index {
             ]);
 
             let offset = offsets_vec[idx];
-            let msb_set = offset & 0x80000000;
+            let msb_set = offset & 0x8000_0000;
             let final_offset = if msb_set > 0 {
-                large_offsets_vec[(offset & 0x7fffffff) as usize]
+                large_offsets_vec[(offset & 0x7fff_ffff) as usize]
             } else {
-                offset as u64
+                u64::from(offset)
             };
 
             entry_vec.push(IndexEntry {
-                id: id,
+                id,
                 offset: final_offset,
                 crc32: crc_vec[idx],
                 next: 0
@@ -128,8 +127,8 @@ impl Index {
         Ok(Index {
             fanout: Fanout(fanout),
             objects: entry_vec,
-            packfile_checksum: packfile_checksum,
-            checksum: checksum
+            packfile_checksum,
+            checksum
         })
     }
 
@@ -172,7 +171,7 @@ impl Index {
             }
         }
 
-        return None
+        None
     }
 }
 

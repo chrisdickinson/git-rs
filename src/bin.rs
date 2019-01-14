@@ -1,9 +1,7 @@
-#![deny(warnings)]
 extern crate git_rs;
 
 use git_rs::stores::{fs as gitfs};
 use git_rs::refs::RefSet;
-use git_rs::id::Id;
 
 pub fn main() -> std::io::Result<()> {
     let current_dir = std::env::current_dir()?;
@@ -20,16 +18,16 @@ pub fn main() -> std::io::Result<()> {
     let id = match ref_set.deref(&query) {
         Some(result) => result.clone(),
         None => {
-            match Id::from_str(&query) {
-                Some(xs) => xs,
-                None => return Ok(())
+            match query.parse() {
+                Ok(xs) => xs,
+                Err(_) => return Ok(())
             }
         }
     };
 
     for (id, commit) in storage_set.commits(&id, None) {
         let message = std::str::from_utf8(&commit.message()).expect("not utf8");
-        let lines: Vec<&str> = message.split("\n").collect();
+        let lines: Vec<&str> = message.split('\n').collect();
         println!("\x1b[33m{} \x1b[0m{}", id, lines[0]);
     };
 

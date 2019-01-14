@@ -26,9 +26,9 @@ impl Commit {
     }
 
     pub fn parents(&self) -> Option<Vec<Id>> {
-        let v = self.attributes.get("parent".as_bytes())?;
+        let v = self.attributes.get(b"parent" as &[u8])?;
         let result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(&id_bytes).ok().and_then(|xs| Id::from_str(xs))
+            std::str::from_utf8(&id_bytes).ok().and_then(|xs| xs.parse().ok())
         }).collect();
         Some(result)
     }
@@ -81,7 +81,7 @@ impl Commit {
                             let value = buf[space + 1..idx].to_vec();
                             attributes
                                 .entry(key)
-                                .or_insert_with(|| Vec::new())
+                                .or_insert_with(Vec::new)
                                 .push(value);
                             anchor = idx + 1;
                             space = idx;
@@ -97,16 +97,16 @@ impl Commit {
 
         let message = buf[message_idx..].to_vec();
 
-        let committer = attributes.get("committer".as_bytes()).and_then(|xs| {
-            if xs.len() > 0 {
+        let committer = attributes.get(b"committer" as &[u8]).and_then(|xs| {
+            if !xs.is_empty() {
                 Identity::parse(xs[0].as_slice())
             } else {
                 None
             }
         });
 
-        let author = attributes.get("author".as_bytes()).and_then(|xs| {
-            if xs.len() > 0 {
+        let author = attributes.get(b"author" as &[u8]).and_then(|xs| {
+            if !xs.is_empty() {
                 Identity::parse(xs[0].as_slice())
             } else {
                 None
@@ -114,9 +114,9 @@ impl Commit {
         });
 
         Ok(Commit {
-            attributes: attributes,
-            message: message,
+            attributes,
             committer,
+            message,
             author
         })
     }

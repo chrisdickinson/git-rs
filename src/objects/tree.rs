@@ -77,7 +77,7 @@ impl Tree {
 
                         entries.insert(name, TreeEntry {
                             mode: FileMode(mode),
-                            id: Id::from(&buf[null + 1..idx + 1])
+                            id: Id::from(&buf[null + 1..=idx])
                         });
 
                         anchor = idx + 1;
@@ -89,7 +89,7 @@ impl Tree {
         }
 
         Ok(Tree {
-            entries: entries
+            entries
         })
     }
 }
@@ -97,6 +97,7 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use crate::id::Id;
+    use std::str::FromStr;
     use crate::objects::tree::FileMode;
 
     #[test]

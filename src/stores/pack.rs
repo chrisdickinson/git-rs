@@ -77,12 +77,13 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
 
         let count = size_vec.len();
         let mut _size = match size_vec.pop() {
-            Some(xs) => xs as u64,
+            Some(xs) => u64::from(xs),
             None => return Err(ErrorKind::CorruptedPackfile.into())
         };
-        while size_vec.len() > 0 {
+
+        while !size_vec.is_empty() {
             let next = match size_vec.pop() {
-                Some(xs) => xs as u64,
+                Some(xs) => u64::from(xs),
                 None => return Err(ErrorKind::CorruptedPackfile.into())
             };
             _size |= next << (4 + 7 * (count - size_vec.len()));
@@ -98,7 +99,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
             OFS_DELTA => {
                 let mut take_one = object_stream.take(1);
                 take_one.read_exact(&mut byte)?;
-                let mut offset = (byte[0] & 0x7F) as u64;
+                let mut offset = u64::from(byte[0] & 0x7F);
                 let mut original_stream = take_one.into_inner();
 
                 while byte[0] & 0x80 > 0 {
@@ -106,7 +107,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
                     offset <<= 7;
                     take_one = original_stream.take(1);
                     take_one.read_exact(&mut byte)?;
-                    offset += (byte[0] & 0x7F) as u64;
+                    offset += u64::from(byte[0] & 0x7F);
                     original_stream = take_one.into_inner();
                 }
 
@@ -157,7 +158,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
             },
 
             _ => {
-                return Err(ErrorKind::BadLooseObject.into())
+                Err(ErrorKind::BadLooseObject.into())
             }
         }
     }
@@ -202,7 +203,7 @@ mod tests {
         let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
         let storage_set = StorageSet::new(Vec::new());
 
-        let id = Id::from_str("872e26b3fbebe64a2a85b271fed6916b964b4fde").unwrap();
+        let id: Id = "872e26b3fbebe64a2a85b271fed6916b964b4fde".parse().unwrap();
         let (kind, mut stream) = pack.get(&id, &storage_set).expect("failure").unwrap();
 
         let obj = kind.load(&mut stream).expect("failed to load object");
