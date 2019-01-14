@@ -1,3 +1,4 @@
+#![deny(warnings)]
 use std::fmt;
 use std::fmt::Write;
 use std::iter::FromIterator;

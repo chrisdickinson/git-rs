@@ -1,11 +1,7 @@
+#![deny(warnings)]
 extern crate git_rs;
 
 use git_rs::stores::{fs as gitfs};
-use git_rs::stores::pack::{ Store as PackStore, GetObject };
-use git_rs::stores::loose::{ Store as LooseStore };
-use git_rs::objects::{ Type, Object };
-use git_rs::packindex::Index;
-use git_rs::errors::Result;
 use git_rs::refs::RefSet;
 use git_rs::id::Id;
 
@@ -21,7 +17,7 @@ pub fn main() -> std::io::Result<()> {
         &args[1]
     };
 
-    let mut id = match ref_set.deref(&query) {
+    let id = match ref_set.deref(&query) {
         Some(result) => result.clone(),
         None => {
             match Id::from_str(&query) {
