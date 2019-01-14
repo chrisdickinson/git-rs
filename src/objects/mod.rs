@@ -1,5 +1,4 @@
 use crate::errors::Result;
-use crate::id::Id;
 
 pub mod commit;
 pub mod blob;

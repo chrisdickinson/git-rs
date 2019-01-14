@@ -1,7 +1,7 @@
 use std;
 
 use crate::errors::{ ErrorKind, Result };
-use std::io::{ Read, Write };
+use std::io::Write;
 
 pub const OFS_DELTA: u8 = 6;
 pub const REF_DELTA: u8 = 7;

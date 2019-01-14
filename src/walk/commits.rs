@@ -1,4 +1,4 @@
-use std::collections::{ HashMap, HashSet, BinaryHeap };
+use std::collections::{ HashSet, BinaryHeap };
 
 use crate::objects::commit::Commit;
 use crate::stores::StorageSet;
@@ -79,9 +79,9 @@ impl<'a> Iterator for CommitIterator<'a> {
         let newest = self.target.pop()?;
 
         if let Some(xs) = newest.1.parents() {
-            let mut seen = &mut self.seen;
+            let seen = &mut self.seen;
             let storage_set = &self.storage_set;
-            let mut parents = xs.iter().filter_map(|id| {
+            let parents = xs.iter().filter_map(|id| {
                 if seen.contains(id) {
                     return None
                 }

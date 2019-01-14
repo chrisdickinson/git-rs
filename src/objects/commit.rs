@@ -1,5 +1,4 @@
-use std::collections::{ HashMap, HashSet };
-use std::str;
+use std::collections::HashMap;
 
 use crate::identity::Identity;
 use crate::errors::Result;

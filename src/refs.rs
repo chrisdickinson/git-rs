@@ -133,7 +133,5 @@ impl RefSet {
                 None => return None
             }
         }
-
-        None
     }
 }

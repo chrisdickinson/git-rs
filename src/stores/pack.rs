@@ -1,8 +1,6 @@
 use std::io::{ BufReader, SeekFrom };
 use flate2::bufread::DeflateDecoder;
-use std::path::{ Path, PathBuf };
 use std::io::prelude::*;
-use std::fs::File;
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };

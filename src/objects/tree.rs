@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use crate::errors::Result;
-use crate::objects::Type;
 use crate::id::Id;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]

@@ -1,5 +1,5 @@
-use crate::stores::pack::{ Store as PackStore, GetObject };
 use crate::stores::loose::{ Store as LooseStore };
+use crate::stores::pack::{ Store as PackStore };
 use crate::stores::{ Storage, StorageSet };
 use crate::packindex::Index;
 

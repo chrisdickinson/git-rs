@@ -1,17 +1,10 @@
 use flate2::bufread::DeflateDecoder;
-use std::borrow::BorrowMut;
 use std::io::prelude::*;
 use std::io::{ BufReader };
-use std::path::Path;
-use std::fs::File;
 
 use crate::stores::{ Storage, StorageSet };
 use crate::errors::{ Result, ErrorKind };
-use crate::objects::{ Type, Object };
-use crate::objects::commit::Commit;
-use crate::objects::blob::Blob;
-use crate::objects::tree::Tree;
-use crate::objects::tag::Tag;
+use crate::objects::Type;
 use crate::id::Id;
 
 pub struct Store {
@@ -139,11 +132,10 @@ impl Storage for Store {
 #[cfg(test)]
 mod tests {
     use crate::stores::{ Storage, StorageSet };
-    use crate::objects::{ Type, Object };
-    use crate::objects::tree::FileMode;
+    use crate::objects::Object;
     use crate::id::Id;
 
-    use super::{ Store, Result, ErrorKind };
+    use super::{ Store, ErrorKind };
 
     #[test]
     fn read_commit_works() {
