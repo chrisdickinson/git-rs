@@ -23,6 +23,15 @@ impl Tree {
     }
 }
 
+impl IntoIterator for Tree {
+    type Item = (Vec<u8>, TreeEntry);
+    type IntoIter = std::collections::hash_map::IntoIter<Vec<u8>, TreeEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
 impl Tree {
     pub fn load<T: std::io::Read>(handle: &mut T) -> Result<Tree> {
         let mut vec = Vec::new();
