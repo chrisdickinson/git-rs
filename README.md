@@ -35,6 +35,20 @@ Rust" (Blandy, Orendorff).
 
 ## PLAN
 
+### 2018-01-15 Update
+
+- I added an (experimental) `git_rs::walk::tree` iterator to take a Tree and yield
+  a path + a blob for each item.
+    - It's probably slower than it should be: for each item it has to clone a `PathBuf`, because I couldn't work out the lifetimes.
+    - **If you know how to fix that**, please [open an issue][ref_8] and let me know :revolving_hearts:
+- I took some time to clean up the warnings during builds.
+    - Oh! I also installed [Clippy][ref_9] which warns about higher level antipatterns in Rust!
+- I'm still noodling over the **2-3x** slowdown between vanilla git and Our Git.
+    - I think I might create two packfile interfaces -- one "generic" and one "mmap"'d, to see if
+      one or the other makes up the difference in performance.
+        - This also has the virtue of being `unsafe` code, which is something I have not yet used
+          in Rust!
+
 ### 2018-01-06 Update
 
 - I wrote an iterator for commits! The [first cut][ref_6] kept a `Vec` of `(Id, Commit)` around,
@@ -106,3 +120,5 @@ Rust" (Blandy, Orendorff).
 [ref_5]: https://www.youtube.com/playlist?list=PL85XCvVPmGQi3tivxDDF1hrT9qr5hdMBZ
 [ref_6]: https://github.com/chrisdickinson/git-rs/blob/254d97e3d840eded4e5ff5a06b9414ff9396e976/src/walk/commits.rs#L56-L71
 [ref_7]: https://github.com/chrisdickinson/git-rs/commit/f8f4cf5f1430b14d3ef0b298ffa9f2cd880d5c28/src/walk/commits.rs#L40
+[ref_8]: https://github.com/chrisdickinson/git-rs/issues/new?title=Here%27s%20how%20to%20remove%20the%20clone()%20from%20walk::tree
+[ref_9]: https://github.com/rust-lang/rust-clippy
