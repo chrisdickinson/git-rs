@@ -1,7 +1,8 @@
+use crate::stores::mmap_pack::{ Store as PackStore };
 use crate::stores::loose::{ Store as LooseStore };
-use crate::stores::pack::{ Store as PackStore };
 use crate::stores::{ Storage, StorageSet };
 use crate::packindex::Index;
+use memmap::MmapOptions;
 
 use std::path::Path;
 
@@ -65,9 +66,10 @@ pub fn packfiles_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Resul
         let mut epb = entry_path.to_path_buf();
         epb.set_extension("pack");
 
-        let store = PackStore::new(move || {
-            Ok(std::fs::File::open(epb.as_path()).expect("success?"))
-        }, Some(idx));
+
+        let file = std::fs::File::open(epb.as_path())?;
+        let mmap = unsafe { MmapOptions::new().map(&file)? };
+        let store = PackStore::new(mmap, Some(idx));
 
         if let Ok(store) = store {
             stores.push(Box::new(store));
