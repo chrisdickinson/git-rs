@@ -39,7 +39,6 @@ impl Commit {
         // attr SP value NL
         // NL
         // message
-
         let mut vec = Vec::new();
         handle.read_to_end(&mut vec)?;
         let buf = &vec;

@@ -77,21 +77,23 @@ impl Store {
 
         match type_flag {
             0...4 => {
-                let mut stream = DeflateDecoder::new(&self.mmap[idx + 2 ..= end as usize]);
+                let mut stream = DeflateDecoder::new(&self.mmap[idx + 2..= end as usize]);
                 let mut results = Vec::new();
                 stream.read_to_end(&mut results)?;
                 Ok((type_flag, Box::new(std::io::Cursor::new(results))))
             },
 
             OFS_DELTA => {
-                let mut offset = u64::from(self.mmap[idx] & 0x7F);
+                let mut byt = self.mmap[idx];
+                let mut offset = u64::from(byt & 0x7F);
                 idx += 1;
 
-                while self.mmap[idx] & 0x80 > 0 {
+                while byt & 0x80 > 0 {
                     offset += 1;
                     offset <<= 7;
-                    offset += u64::from(self.mmap[idx] & 0x7F);
+                    byt = self.mmap[idx];
                     idx += 1;
+                    offset += u64::from(byt & 0x7F);
                 }
 
                 let mut deflate_stream = DeflateDecoder::new(&self.mmap[idx + 2 ..= end as usize]);
