@@ -49,6 +49,8 @@ Rust" (Blandy, Orendorff).
         - This also has the virtue of being `unsafe` code, which is something I have not yet used
           in Rust!
 
+* * *
+
 ### 2018-01-06 Update
 
 - I wrote an iterator for commits! The [first cut][ref_6] kept a `Vec` of `(Id, Commit)` around,
