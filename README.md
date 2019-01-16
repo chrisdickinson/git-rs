@@ -14,6 +14,7 @@ Rust" (Blandy, Orendorff).
     - [x] Read delta'd objects
     - [ ] Fix interface so we don't need to run `open` for each `read()`
 - [x] Load refs off of disk
+- [ ] Load packed-refs
 - [x] Parse git signatures ("Identity"'s)
 - [x] Create iterator for walking commit graph
 - [ ] Create iterator for walking trees

@@ -8,16 +8,31 @@ use std::path::Path;
 
 pub fn from(path: &Path) -> Result<StorageSet, std::io::Error> {
     let mut backends = Vec::new();
-    loose_from_path(path, &mut backends);
+    loose_from_path(path, &mut backends)?;
     packfiles_from_path(path, &mut backends)?;
     Ok(StorageSet::new(backends))
 }
 
-pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) {
+pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Result<(), std::io::Error> {
     let mut root = std::path::PathBuf::new();
     root.push(path);
     root.push(".git");
     root.push("objects");
+
+    let mut filter = [false; 256];
+    for entry in std::fs::read_dir(root.as_path())? {
+        let entry = entry?;
+        let os_filename = entry.file_name();
+        if os_filename.len() != 2 {
+            continue
+        }
+
+        let result = match usize::from_str_radix(&os_filename.to_string_lossy(), 16) {
+            Ok(xs) => xs,
+            Err(_) => continue
+        };
+        filter[result] = true;
+    }
 
     let loose_store = LooseStore::new(move |id| {
         let as_str = id.to_string();
@@ -33,9 +48,10 @@ pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) {
                 }
             }
         }
-    });
+    }, Some(filter));
 
     stores.push(Box::new(loose_store));
+    Ok(())
 }
 
 pub fn packfiles_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Result<(), std::io::Error> {

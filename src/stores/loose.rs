@@ -10,42 +10,31 @@ use crate::id::Id;
 type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>>;
 
 pub struct Store {
-    read: Box<Reader>
+    read: Box<Reader>,
+    filter: [bool; 256]
 }
 
-// pub struct LooseFS {
-//     root: Path
-// }
-// 
-// impl LooseFS {
-//     fn read(&self, id: &Id) -> Result<Option<Self::Reader>> {
-//         let as_str = id.to_string();
-//         let mut pb = self.root.to_path_buf();
-//         pb.push(as_str[0..2].to_string());
-//         pb.push(as_str[2..40].to_string());
-//         match File::open(pb.as_path()) {
-//             Ok(f) => Ok(Some(f)),
-//             Err(e) => {
-//                 match e.kind() {
-//                     std::io::ErrorKind::NotFound => return Ok(None),
-//                     _ => return Err(e)?
-//                 }
-//             }
-//         }
-//     }
-// }
-
 impl Store {
-    pub fn new<C>(func: C) -> Self
+    pub fn new<C>(func: C, filter: Option<[bool; 256]>) -> Self
         where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static {
+        let filter = match filter {
+            Some(xs) => xs,
+            None => [true; 256]
+        };
+
         Store {
-            read: Box::new(func)
+            read: Box::new(func),
+            filter
         }
     }
 }
 
 impl Storage for Store {
     fn get(&self, id: &Id, _: &StorageSet) -> Result<Option<(Type, Box<std::io::Read>)>> {
+        if !self.filter[id.as_ref()[0] as usize] {
+            return Ok(None)
+        }
+
         let maybe_reader = (self.read)(id)?;
         if maybe_reader.is_none() {
             return Ok(None)
