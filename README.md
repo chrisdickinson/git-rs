@@ -36,7 +36,7 @@ Rust" (Blandy, Orendorff).
 
 ## PLAN
 
-### 2018-01-15 Update
+### 2019-01-15 Update
 
 - I added an (experimental) `git_rs::walk::tree` iterator to take a Tree and yield
   a path + a blob for each item.
