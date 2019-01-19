@@ -12,12 +12,12 @@ Rust" (Blandy, Orendorff).
 - [x] Read objects from pack store
     - [x] Read packfile indexes
     - [x] Read delta'd objects
-    - [ ] Fix interface so we don't need to run `open` for each `read()`
+    - [x] Fix interface so we don't need to run `open` for each `read()`
 - [x] Load refs off of disk
 - [ ] Load packed-refs
 - [x] Parse git signatures ("Identity"'s)
 - [x] Create iterator for walking commit graph
-- [ ] Create iterator for walking trees
+- [x] Create iterator for walking trees
     - [ ] Materialize trees to disk (post gitindex?)
 - [ ] Create index from packfile
 - [ ] Create interface for writing new objects

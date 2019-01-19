@@ -14,6 +14,16 @@ pub struct TreeIterator<'a> {
     path_segments: PathBuf
 }
 
+impl<'a> TreeIterator<'a> {
+    pub fn new(storage_set: &'a StorageSet, layers: Vec<IntoIter<Vec<u8>, TreeEntry>>) -> TreeIterator {
+        TreeIterator {
+            path_segments: PathBuf::from("."),
+            storage_set,
+            layers
+        }
+    }
+}
+
 impl<'a> Iterator for TreeIterator<'a> {
     type Item = (PathBuf, FileMode, Blob);
 
@@ -37,8 +47,10 @@ impl<'a> Iterator for TreeIterator<'a> {
                     },
 
                     Object::Blob(xs) => {
+                        let mut pb = self.path_segments.clone();
+                        pb.push(OsStr::from_bytes(&key));
                         return Some(
-                            (self.path_segments.clone(), entry.mode, xs)
+                            (pb, entry.mode, xs)
                         )
                     },
 

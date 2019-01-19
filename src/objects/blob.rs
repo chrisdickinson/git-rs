@@ -1,11 +1,16 @@
 use crate::errors::{ Result, ErrorKind };
 
 pub struct Blob {
-    pub contents: Box<std::io::Read>
+    pub contents: Vec<u8>
 }
 
 impl Blob {
-    pub fn load<T: std::io::Read>(_handle: &mut T) -> Result<Blob> {
-        Err(ErrorKind::NotImplemented.into())
+    pub fn load<T: std::io::Read>(handle: &mut T) -> Result<Blob> {
+        let mut contents = Vec::new();
+        handle.read_to_end(&mut contents)?;
+
+        Ok(Blob {
+            contents
+        })
     }
 }

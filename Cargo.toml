@@ -17,5 +17,9 @@ name = "git_rs"
 path = "src/lib.rs"
 
 [[bin]]
-name = "git_rs"
-path = "src/bin.rs"
+name = "git_rs_log"
+path = "src/bin/log.rs"
+
+[[bin]]
+name = "git_rs_read_tree"
+path = "src/bin/read_tree.rs"

@@ -8,8 +8,8 @@ use std::path::Path;
 
 pub fn from(path: &Path) -> Result<StorageSet, std::io::Error> {
     let mut backends = Vec::new();
-    loose_from_path(path, &mut backends)?;
     packfiles_from_path(path, &mut backends)?;
+    loose_from_path(path, &mut backends)?;
     Ok(StorageSet::new(backends))
 }
 
