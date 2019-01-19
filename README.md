@@ -52,7 +52,7 @@ Rust" (Blandy, Orendorff).
 
 * * *
 
-### 2018-01-06 Update
+### 2019-01-06 Update
 
 - I wrote an iterator for commits! The [first cut][ref_6] kept a `Vec` of `(Id, Commit)` around,
   so we could always pick the most recent "next" commit out of the graph (since commits may have
@@ -72,7 +72,7 @@ Rust" (Blandy, Orendorff).
 
 * * *
 
-### 2018-01-02 Update
+### 2019-01-02 Update
 
 - I implemented [ref loading][ref_2]. It was a bit of a pain! Translating to and
   from `Path` types took a bit of doing.
