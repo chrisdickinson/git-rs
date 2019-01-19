@@ -13,6 +13,9 @@ Rust" (Blandy, Orendorff).
     - [x] Read packfile indexes
     - [x] Read delta'd objects
     - [x] Fix interface so we don't need to run `open` for each `read()`
+    - [ ] **BUG**: certain OFS deltas are misapplied.
+        - [ ] Isolate the error case
+        - [ ] Fix it
 - [x] Load refs off of disk
 - [ ] Load packed-refs
 - [x] Parse git signatures ("Identity"'s)
@@ -24,6 +27,7 @@ Rust" (Blandy, Orendorff).
 - [ ] `.git/index` support
     - [ ] Read git index cache
     - [ ] Write git index cache
+- [ ] Add benchmarks
 - [ ] Create packfile from list of objects (API TKTK)
 - [ ] Network protocol
     - [ ] receive-pack
@@ -35,6 +39,25 @@ Rust" (Blandy, Orendorff).
 * * *
 
 ## PLAN
+
+### 2019-01-19 Update
+
+- It's slightly faster! :tada:
+    - mmap sped things along nicely, shaving 20ms off of our runtime.
+    - We're still reliably _slower_ than git, though. It might be because we load the refset
+      immediately.
+    - I kept the immutable "file per read" packfile store around; I think it may come in handy
+      in the future.
+    - It would be excellent to capture this as a benchmark instead of running it ad-hoc.
+- I integrated the tree walking iterator and got a nice surprise:
+    - There's a bug in my OFS delta code!
+    - This is interesting, because it only appears for certain blobs in certain repositories.
+        - Otherwise other OFS deltas seem to resolve cleanly.
+        - Case in point: many of the commits I load as a test of the commit walk-er are OFS-delta'd.
+    - Also of note: I've split from `src/bin.rs` into dedicated binaries for tree walking and commit walking.
+- Today's theme: isolate the bug in a test case.
+
+* * *
 
 ### 2019-01-15 Update
 
