@@ -25,7 +25,7 @@ pub fn main() -> std::io::Result<()> {
         }
     };
 
-    for (pathbuf, filemode, blob) in storage_set.tree(&id) {
+    for (pathbuf, _, _blob) in storage_set.tree(&id) {
         println!("{:?}", pathbuf)
     }
 

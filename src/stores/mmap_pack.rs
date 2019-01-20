@@ -168,10 +168,11 @@ impl Storage for Store {
 #[cfg(test)]
 mod tests {
 
+    use super::Id;
     use super::Index;
     use super::Store;
-    use super::Id;
-    use std::io::Cursor;
+    use std::io::Write;
+    use memmap::MmapOptions;
     use crate::objects::Object;
     use crate::stores::{ Storage, StorageSet };
 
@@ -180,7 +181,19 @@ mod tests {
         let bytes = include_bytes!("../../fixtures/pack_index");
 
         let idx = Index::from(&mut bytes.as_ref()).expect("bad index");
-        let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
+
+        let packfile_bytes = include_bytes!("../../fixtures/packfile");
+        let mut packfile_mmap = MmapOptions::new()
+            .len(packfile_bytes.len())
+            .map_anon()
+            .expect("couldn't mmap");
+
+        (&mut packfile_mmap[..]).write(packfile_bytes).expect("could not wrote the bytes");
+
+        let pack = Store::new(
+            packfile_mmap.make_read_only().expect("could not make read-only"),
+            Some(idx)
+        ).expect("bad packfile");
         let storage_set = StorageSet::new(Vec::new());
 
         let id: Id = "872e26b3fbebe64a2a85b271fed6916b964b4fde".parse().unwrap();

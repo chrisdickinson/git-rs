@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn read_commit_works() {
-        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_commit") as &[u8]))));
+        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_commit") as &[u8]))), None);
         let storage_set = StorageSet::new(Vec::new());
 
         let option = store.get(&Id::default(), &storage_set).expect("it exploded");
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn read_tree_works() {
-        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_tree") as &[u8]))));
+        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_tree") as &[u8]))), None);
         let storage_set = StorageSet::new(Vec::new());
 
         let option = store.get(&Id::default(), &storage_set).expect("it exploded");
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn handles_idtoreadable_failures() {
-        let store = Store::new(|_| Err(ErrorKind::BadLooseObject.into()));
+        let store = Store::new(|_| Err(ErrorKind::BadLooseObject.into()), None);
         let storage_set = StorageSet::new(Vec::new());
 
         match store.get(&Id::default(), &storage_set) {
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn handles_idtoreadable_misses() {
-        let store = Store::new(|_| Ok(None));
+        let store = Store::new(|_| Ok(None), None);
         let storage_set = StorageSet::new(Vec::new());
 
         match store.get(&Id::default(), &storage_set) {

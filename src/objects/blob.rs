@@ -1,4 +1,4 @@
-use crate::errors::{ Result, ErrorKind };
+use crate::errors::Result;
 
 pub struct Blob {
     pub contents: Vec<u8>
