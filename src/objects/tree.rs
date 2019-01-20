@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use crate::errors::Result;
 use crate::id::Id;
 
@@ -13,18 +13,18 @@ pub struct TreeEntry {
 
 #[derive(Debug)]
 pub struct Tree {
-    entries: HashMap<Vec<u8>, TreeEntry>
+    entries: BTreeMap<Vec<u8>, TreeEntry>
 }
 
 impl Tree {
-    pub fn entries (&self) -> &HashMap<Vec<u8>, TreeEntry> {
+    pub fn entries (&self) -> &BTreeMap<Vec<u8>, TreeEntry> {
         &self.entries
     }
 }
 
 impl IntoIterator for Tree {
     type Item = (Vec<u8>, TreeEntry);
-    type IntoIter = std::collections::hash_map::IntoIter<Vec<u8>, TreeEntry>;
+    type IntoIter = std::collections::btree_map::IntoIter<Vec<u8>, TreeEntry>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.entries.into_iter()
@@ -43,7 +43,7 @@ impl Tree {
             FindNull,
             CollectHash
         }
-        let mut entries = HashMap::new();
+        let mut entries = BTreeMap::new();
         let mut anchor = 0;
         let mut space = 0;
         let mut null = 0;

@@ -1,4 +1,4 @@
-use std::collections::hash_map::{ IntoIter };
+use std::collections::btree_map::{ IntoIter };
 use std::path::{ PathBuf };
 use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
