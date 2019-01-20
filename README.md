@@ -56,6 +56,13 @@ Rust" (Blandy, Orendorff).
         - Case in point: many of the commits I load as a test of the commit walk-er are OFS-delta'd.
     - Also of note: I've split from `src/bin.rs` into dedicated binaries for tree walking and commit walking.
 - Today's theme: isolate the bug in a test case.
+    - **EOD Update**: It's really helpful to have a reference implementation.
+    - I've confirmed that the reference implementation _can read_ the object that breaks this project.
+        - We are reading the same offsets, as well (phew)
+    - I've further confirmed that swapping out the packfile implementation for the older, slower packfile
+      doesn't affect anything.
+    - *I suspect* this means there's either a problem in my delta code (highly possible!), my varint decoding
+      code (*very* possible), or the Read implementation for Deltas. Yay, narrowed down results!
 
 * * *
 
