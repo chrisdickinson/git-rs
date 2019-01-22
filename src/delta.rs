@@ -90,16 +90,18 @@ fn read_varint(base_offset: usize, bytes: &[u8]) -> (usize, usize) {
 impl std::io::Read for DeltaDecoderStream {
     fn read(&mut self, mut buf: &mut [u8]) -> std::io::Result<usize> {
         let mut written = 0;
-        while self.index < self.instructions.len() {
+        loop {
             let (next_state, exhausted) = match &self.state {
                 DeltaDecoderState::Done => {
                     if self.written != self.output_size {
                         return Err(std::io::ErrorKind::WriteZero.into())
                     }
-                    return Ok(0)
+                    return Ok(written)
                 },
+
                 DeltaDecoderState::NextCommand => {
-                    if self.index == self.instructions.len() {
+                    if self.index >= self.instructions.len() {
+                        self.written += written;
                         (DeltaDecoderState::Done, false)
                     } else {
                         let cmd = self.instructions[self.index];
@@ -150,7 +152,6 @@ impl std::io::Read for DeltaDecoderStream {
                     let extent = state.extent - wrote;
                     let offset = state.offset + wrote;
                     written += wrote;
-
                     if extent == 0 {
                         (DeltaDecoderState::NextCommand, false)
                     } else {
