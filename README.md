@@ -13,9 +13,9 @@ Rust" (Blandy, Orendorff).
     - [x] Read packfile indexes
     - [x] Read delta'd objects
     - [x] Fix interface so we don't need to run `open` for each `read()`
-    - [ ] **BUG**: certain OFS deltas are misapplied.
-        - [ ] Isolate the error case
-        - [ ] Fix it
+    - [x] **BUG**: certain OFS deltas are misapplied.
+        - [x] Isolate the error case
+        - [x] Fix it
 - [x] Load refs off of disk
 - [ ] Load packed-refs
 - [x] Parse git signatures ("Identity"'s)
@@ -39,6 +39,56 @@ Rust" (Blandy, Orendorff).
 * * *
 
 ## PLAN
+
+### 2019-01-21 Update
+
+- Well, that was a fun bug. Let's walk through it, shall we?
+    - This _occasionally_ showed up when a delta would decode another delta'd object.
+        - I found a hash that would reliably fail to load.
+        - We'd fail the read because the incoming base object would not match the 2nd
+          delta's "base size". [Here][ref_10].
+        - Removing the check to see if I got the deltas wrong would cause the thread to
+          panic -- the delta's base size _wasn't a lie_.
+    - First, I switched back to my old mmap-less packfile implementation, because I recently
+      touched that code. "Revert the thing you touched last" is a winning strategy in these
+      cases: doesn't cost expensive thinking, quickly puts bounds around the bug.
+        - Alas, the old packfile implementation _also_ had this bug. **No dice.**
+    - I compared the output of this git implementation to my [JS implementation][ref_11].
+        - I confirmed that the output of the JS implementation worked by comparing its output
+          for the hash of concern to vanilla git.
+        - After confirming that, I logged out the offsets being read from the file and the expected
+          sizes. I compared this to similar debugging output I added to `git-rs`.
+            - The offsets are the bound values sent into [the packfile][ref_12]. For the outermost
+              read ("Give me the object represented by `eff4c6de1bd15cb0d28581e4da17035dbf9e8596`"),
+              the offsets come from the packfile index.
+            - For `OFS_DELTA` ("offset delta") types, the start offset is obtained by reading a [varint][ref_13]
+              from the packfile and subtracting it from the current start offset.
+        - The offsets and expected sizes matched!
+            - This meant that:
+                1. I was reading the correct data from the packfile
+                2. I was reading varints correctly
+                3. The bug must be in the application of the delta to a base object
+        - From there I added logging above [these state transitions][ref_14], noting the particulars of the
+          operation.
+            - I added the same logging to the JS implementation, and found that (aside from
+              totally bailing out ahead of the 2nd delta application) the commands were the same.
+            - So it wasn't even that my delta code was wrong: it was my `Read` state machine.
+    - At this point, I was like: "This is a read state machine bug. [I know this][ref_15]."
+        - So, one of the things this state machine does is carefully bail out if it
+          can't [write all of the bytes for a command][ref_16]. ("If there remains an `extent` to write,
+          record the next state and break the loop.")
+        - However, at this point we've already consumed the last command. There are no more instructions.
+        - So if this function were to be called again, ...
+            - We would politely (but firmly) [tell the caller][ref_17] to [buzz off][ref_18] (`written == 0`, here.).
+    - [The fix][ref_19] turned out to be simple, as these fixes usually are.
+        - (I need to write a test for this, I know. I know. Pile your shame on me.)
+- So [what did we learn][ref_20]?
+    - Always test your state machines, folks.
+    - (I've said it once, and I'm saying it again.) Malleable reference implementations will save your bacon.
+        - Make sure you can trust your reference implementation.
+- Anyway. The tree reader works now! :evergreen_tree::deciduous_tree::evergreen_tree:
+
+* * *
 
 ### 2019-01-19 Update
 
@@ -155,3 +205,14 @@ Rust" (Blandy, Orendorff).
 [ref_7]: https://github.com/chrisdickinson/git-rs/commit/f8f4cf5f1430b14d3ef0b298ffa9f2cd880d5c28/src/walk/commits.rs#L40
 [ref_8]: https://github.com/chrisdickinson/git-rs/issues/new?title=Here%27s%20how%20to%20remove%20the%20clone()%20from%20walk::tree
 [ref_9]: https://github.com/rust-lang/rust-clippy
+[ref_10]: https://github.com/chrisdickinson/git-rs/blob/12afab5462f67c8670671177b4053aa566b45338/src/delta.rs#L45-L47
+[ref_11]: https://github.com/chrisdickinson/git-odb-pack
+[ref_12]: https://github.com/chrisdickinson/git-rs/blob/eff4c6de1bd15cb0d28581e4da17035dbf9e8596/src/stores/mmap_pack.rs#L41
+[ref_13]: https://developers.google.com/protocol-buffers/docs/encoding#varints
+[ref_14]: https://github.com/chrisdickinson/git-rs/blob/eff4c6de1bd15cb0d28581e4da17035dbf9e8596/src/delta.rs#L133-L140
+[ref_15]: https://66.media.tumblr.com/cd7765c4bfbe7d124ad2b7bf344b9588/tumblr_p902faD2n61wzvt9qo1_500.gif
+[ref_16]: https://github.com/chrisdickinson/git-rs/blob/eff4c6de1bd15cb0d28581e4da17035dbf9e8596/src/delta.rs#L154-L161
+[ref_17]: https://github.com/chrisdickinson/git-rs/blob/12afab5462f67c8670671177b4053aa566b45338/src/delta.rs#L93
+[ref_18]: https://github.com/chrisdickinson/git-rs/blob/12afab5462f67c8670671177b4053aa566b45338/src/delta.rs#L187
+[ref_19]: https://github.com/chrisdickinson/git-rs/commit/1442539cd01b7140ff2f58bc5df39e4686bd6843
+[ref_20]: https://thumbs.gfycat.com/PiercingSnarlingArabianhorse-size_restricted.gif
