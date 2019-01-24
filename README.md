@@ -40,6 +40,34 @@ Rust" (Blandy, Orendorff).
 
 ## PLAN
 
+### 2019-01-23 Update
+
+- It's time to start indexing packfiles.
+    - This'll let us start talking to external servers and cloning things!
+- However, it's kind of a pain.
+    - Packfiles (viewed as a store) aren't hugely useful until you have an index, so
+      I had designed them as an object that takes an optional index from outside.
+        - My thinking was that if an index was not given, we would build one in-memory.
+    - That just blew up in my face, a little bit. :boom:
+    - In order to build an index from a packfile you have to iterate over all of the objects.
+        - For each object, you want to record the offset and the SHA1 id of the object at that offset.
+        - **However**, the object might be an offset or a reference delta.
+            - That means that in order to index a packfile, you've got to be able
+              to read delta'd objects at offsets within the packfile (implying you already
+              have the `Packfile` instance created) and outside of the packfile (
+              implying you have a `StorageSet`.)
+            - In other words: my assumptions about the program design are wrong.
+    - So, in the next day or so I'll be reversing course.
+        - It should be possible to produce a `Packfile` as a non-store object _and_
+          iterate over it.
+        - The "store" form of a packfile should be the combination of a `Packfile`
+          and an `Index` (a `PackfileStore`.)
+            - This means I'll be splitting the logic of `src/stores/mmap_pack` into
+              "sequential packfile reads" and "random access packfile reads (with an index.)"
+- It's fun to be wrong :tada:
+
+* * *
+
 ### 2019-01-21 Update
 
 - Well, that was a fun bug. Let's walk through it, shall we?
