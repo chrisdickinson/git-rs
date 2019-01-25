@@ -11,6 +11,8 @@ flate2 = "1.0.6"
 byteorder = "1.2.7"
 chrono = "0.4.6"
 memmap = "0.7.0"
+crc = "^1.0.0"
+rust-crypto = "0.2.36"
 
 [lib]
 name = "git_rs"
