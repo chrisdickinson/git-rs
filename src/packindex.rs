@@ -56,6 +56,79 @@ impl Index {
         self.objects.as_slice()
     }
 
+    pub fn from_packfile<T: std::fmt::Debug + std::io::Read + std::io::Seek>(mut stream: T) -> Result<Index> {
+        let mut stream = std::io::BufReader::new(stream);
+        let mut magic = [0u8; 4];
+        stream.read_exact(&mut magic)?;
+
+        if &magic != b"PACK" {
+            return Err(ErrorKind::CorruptedPackfile.into())
+        }
+
+        let mut version_bytes = [0u8; 4];
+        stream.read_exact(&mut version_bytes)?;
+
+        let version = unsafe { std::mem::transmute::<[u8; 4], u32>(version_bytes) }.to_be();
+        println!("saw version = {}", version);
+        match version {
+            2 | 3 => (),
+            _ => return Err(ErrorKind::NotImplemented.into())
+        };
+
+        let mut object_count_bytes = [0u8; 4];
+        stream.read_exact(&mut object_count_bytes)?;
+        let object_count = unsafe { std::mem::transmute::<[u8; 4], u32>(version_bytes) }.to_be();
+
+        let mut index_entries: Vec<IndexEntry> = Vec::with_capacity(object_count as usize);
+        for _ in 0..object_count {
+            let offset = stream.seek(std::io::SeekFrom::Current(0))?;
+            let mut byte = [0u8; 1];
+            stream.read_exact(&mut byte)?;
+
+            let obj_type = (byte[0] & 0x70) >> 4;
+            let mut size = (byte[0] & 0xf) as u64;
+            let mut count = 0;
+            let mut continuation = byte[0] & 0x80;
+            loop {
+                if continuation < 1 {
+                    break
+                }
+
+                stream.read_exact(&mut byte)?;
+                continuation = byte[0] & 0x80;
+
+                size |= ((byte[0] & 0x7f) as u64) << (4 + 7 * count);
+                count += 1;
+            }
+
+            stream.read_exact(&mut [0u8; 2])?;
+            let mut deflated = DeflateDecoder::new(stream);
+            let mut data = vec![0u8; size as usize];
+            deflated.read_exact(&mut data)?;
+
+            let mut hash = Sha1::new();
+
+            hash.input(&data[..]);
+            let mut id_output = [0u8; 20];
+            hash.result(&mut id_output);
+
+            let entry = IndexEntry {
+                id: Id::from(&id_output[..]),
+                offset,
+                crc32: 0xdeadbeef, // dunno what we're crc'ing, yet.
+                next: 0
+            };
+
+            println!("read id = {}", entry.id);
+            index_entries.push(entry);
+
+            stream = deflated.into_inner();
+        }
+
+        println!("done!");
+        return Err(ErrorKind::NotImplemented.into())
+    }
+
     pub fn from<T: std::io::Read>(mut stream: T) -> Result<Index> {
         let mut magic = [0u8; 4];
         stream.read_exact(&mut magic)?;
@@ -194,5 +267,12 @@ mod tests {
 
         let offsets: Vec<u64> = idx.objects().iter().take(4).map(|xs| xs.offset).collect();
         assert_eq!(offsets, vec![264, 318, 169, 12]);
+    }
+
+    #[test]
+    fn can_create_from_packfile() {
+        let bytes = include_bytes!("../fixtures/packfile");
+
+        Index::from_packfile(std::io::Cursor::new(&bytes[..])).expect("failed to load");
     }
 }

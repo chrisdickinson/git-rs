@@ -1,7 +1,9 @@
-use crate::stores::mmap_pack::{ Store as PackStore };
-use crate::stores::pack::{ Store as SlowPackStore };
 use crate::stores::loose::{ Store as LooseStore };
+use crate::pack::mmap::Reader as MmapPackReader;
+use crate::stores::pack::{ Store as PackStore };
+use crate::pack::any::Reader as AnyPackReader;
 use crate::stores::{ Storage, StorageSet };
+use crate::pack::mmap::Reader;
 use crate::packindex::Index;
 use memmap::MmapOptions;
 
@@ -86,21 +88,16 @@ pub fn packfiles_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Resul
 
         // TODO: move this into a second function.
         if false {
-            let store = SlowPackStore::new(move || {
+            let packfile = AnyPackReader::new(move || {
                 Ok(std::fs::File::open(epb.as_path()).expect("success?"))
-            }, Some(idx));
+            });
 
-            if let Ok(store) = store {
-                stores.push(Box::new(store));
-            }
+            stores.push(Box::new(PackStore::new(packfile, idx)));
         } else {
             let file = std::fs::File::open(epb.as_path())?;
             let mmap = unsafe { MmapOptions::new().map(&file)? };
-            let store = PackStore::new(mmap, Some(idx));
-
-            if let Ok(store) = store {
-                stores.push(Box::new(store));
-            }
+            let packfile = MmapPackReader::new(mmap);
+            stores.push(Box::new(PackStore::new(packfile, idx)));
         }
     }
 

@@ -1,35 +1,42 @@
-use std::ops::Range;
+use std::io::{ BufReader, SeekFrom };
+use flate2::bufread::DeflateDecoder;
+use std::io::prelude::*;
 use std::io::Cursor;
-use memmap::Mmap;
+use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
 use crate::pack::internal_type::PackfileType;
 use crate::pack::generic_read::packfile_read;
+use crate::stores::{ Storage, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::iter::PackfileIterator;
-use crate::stores::StorageSet;
-use crate::packindex::Index;
 use crate::pack::Packfile;
 use crate::objects::Type;
 use crate::id::Id;
 
-pub struct Reader {
-    mmap: Mmap
+pub type GetObject = Fn(&Id) -> Result<Option<(Type, Box<std::io::Read>)>>;
+
+pub struct Reader<R> {
+    read: Box<Fn() -> Result<R>>,
 }
 
-impl Reader {
-    pub fn new(mmap: Mmap) -> Self {
+impl<R: std::io::Read + std::io::Seek + 'static> Reader<R> {
+    pub fn new<C>(func: C) -> Self
+        where C: Fn() -> Result<R> + 'static {
+
         Reader {
-            mmap
+            read: Box::new(func)
         }
     }
 }
 
-impl Packfile for Reader {
-    fn read_bounds(&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
-        let mut cursor = std::io::Cursor::new(&self.mmap[start as usize .. end as usize]);
+impl<R: std::io::Read + std::io::Seek> Packfile for Reader<R> {
+    fn read_bounds (&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
+        let handle = (self.read)()?;
+        let mut buffered_file = BufReader::new(handle);
         let mut output = Vec::new();
-        let packfile_type = packfile_read(&mut cursor, &mut output, backends)?;
+        buffered_file.seek(SeekFrom::Start(start))?;
+        let packfile_type = packfile_read(&mut buffered_file, &mut output, backends)?;
         match packfile_type {
             PackfileType::Plain(t) => {
                 Ok((t, Box::new(Cursor::new(output))))
@@ -67,8 +74,4 @@ impl Packfile for Reader {
     fn entries(self) -> Result<PackfileIterator> {
         Err(ErrorKind::NotImplemented.into())
     }
-}
-
-#[cfg(test)]
-mod tests {
 }
