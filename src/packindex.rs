@@ -1,8 +1,11 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{ BigEndian, ReadBytesExt };
+use flate2::bufread::DeflateDecoder;
+use crypto::{ sha1::Sha1, digest::Digest };
+use std::io::{ Read, Seek };
 use std;
 
 use crate::id::Id;
-use crate::errors::Result;
+use crate::errors::{ Result, ErrorKind };
 
 // index notes:
 //      all oids are stored sorted
