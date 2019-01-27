@@ -17,12 +17,14 @@ Rust" (Blandy, Orendorff).
         - [x] Isolate the error case
         - [x] Fix it
 - [x] Load refs off of disk
-- [ ] Load packed-refs
 - [x] Parse git signatures ("Identity"'s)
 - [x] Create iterator for walking commit graph
 - [x] Create iterator for walking trees
     - [ ] Materialize trees to disk (post gitindex?)
 - [ ] Create index from packfile
+    - [ ] Rename `Storage` trait to `Queryable`
+    - [ ] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
+- [ ] Load packed-refs
 - [ ] Create interface for writing new objects
 - [ ] `.git/index` support
     - [ ] Read git index cache
