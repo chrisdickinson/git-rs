@@ -1,3 +1,4 @@
+use crate::pack::internal_type::PackfileType;
 use crate::errors::Result;
 
 pub mod commit;
@@ -5,6 +6,7 @@ pub mod blob;
 pub mod tree;
 pub mod tag;
 
+#[derive(Copy, Clone, Debug)]
 pub enum Type {
     Commit,
     Tree,
@@ -19,7 +21,39 @@ pub enum Object {
     Tag(tag::Tag)
 }
 
+impl std::convert::From<PackfileType> for Type {
+    fn from(t: PackfileType) -> Type {
+        match t {
+            PackfileType::Plain(ident) => {
+                match ident {
+                    1 => Type::Commit,
+                    2 => Type::Tree,
+                    3 => Type::Blob,
+                    4 => Type::Tag,
+                    _ => {
+                        panic!("Unknown packfile type");
+                        return Type::Tag
+                    }
+                }
+            },
+            _ => {
+                panic!("Cannot convert delta packfile type to external type");
+                return Type::Tag
+            }
+        }
+    }
+}
+
 impl Type {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Type::Commit => "commit",
+            Type::Tree => "tree",
+            Type::Blob => "blob",
+            Type::Tag => "tag"
+        }
+    }
+
     pub fn load<T: std::io::Read>(&self, stream: &mut T) -> Result<Object> {
         match &self {
             Type::Commit => {

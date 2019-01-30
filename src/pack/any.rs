@@ -30,13 +30,13 @@ impl<R: std::io::Read + std::io::Seek + 'static> Reader<R> {
     }
 }
 
-impl<R: std::io::Read + std::io::Seek> Packfile for Reader<R> {
+impl<R: std::io::Read + std::io::Seek + std::fmt::Debug> Packfile for Reader<R> {
     fn read_bounds (&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
         let mut output = Vec::new();
         buffered_file.seek(SeekFrom::Start(start))?;
-        let packfile_type = packfile_read(&mut buffered_file, &mut output, backends)?;
+        let packfile_type = packfile_read(&mut buffered_file, &mut output)?;
         match packfile_type {
             PackfileType::Plain(t) => {
                 Ok((t, Box::new(Cursor::new(output))))
@@ -69,9 +69,5 @@ impl<R: std::io::Read + std::io::Seek> Packfile for Reader<R> {
                 Ok((t, Box::new(stream)))
             }
         }
-    }
-
-    fn entries(self) -> Result<PackfileIterator> {
-        Err(ErrorKind::NotImplemented.into())
     }
 }

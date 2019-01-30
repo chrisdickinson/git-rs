@@ -12,5 +12,6 @@ error_chain! {
         BadLooseObject
         NotImplemented
         CorruptedPackfile
+        NeedStorageSet
     }
 }

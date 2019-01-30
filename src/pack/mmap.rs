@@ -29,7 +29,7 @@ impl Packfile for Reader {
     fn read_bounds(&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
         let mut cursor = std::io::Cursor::new(&self.mmap[start as usize .. end as usize]);
         let mut output = Vec::new();
-        let packfile_type = packfile_read(&mut cursor, &mut output, backends)?;
+        let packfile_type = packfile_read(&mut cursor, &mut output)?;
         match packfile_type {
             PackfileType::Plain(t) => {
                 Ok((t, Box::new(Cursor::new(output))))
@@ -62,10 +62,6 @@ impl Packfile for Reader {
                 Ok((t, Box::new(stream)))
             }
         }
-    }
-
-    fn entries(self) -> Result<PackfileIterator> {
-        Err(ErrorKind::NotImplemented.into())
     }
 }
 

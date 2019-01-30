@@ -4,9 +4,15 @@ use std::iter::FromIterator;
 
 use crate::errors::{ ErrorKind, Error };
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Debug, Clone, Hash)]
+#[derive(Default, PartialEq, Eq, PartialOrd, Clone, Hash)]
 pub struct Id {
     bytes: [u8; 20]
+}
+
+impl fmt::Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
 }
 
 #[inline]

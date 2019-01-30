@@ -1,18 +1,18 @@
 use std::io::{ BufReader, SeekFrom };
-use flate2::bufread::DeflateDecoder;
+use flate2::bufread::ZlibDecoder;
 use std::io::prelude::*;
 use std::ops::Range;
 use std;
 
+use crate::delta::{ OFS_DELTA, REF_DELTA };
 use crate::stores::{ Storage, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::internal_type::PackfileType;
 use crate::id::Id;
 
-pub fn packfile_read<R: Read + BufRead + Seek, W: Write>(
+pub fn packfile_read<R: std::fmt::Debug + Read + BufRead + Seek, W: Write>(
     input: &mut R,
-    output: &mut W,
-    backends: &StorageSet
+    output: &mut W
 ) -> Result<PackfileType> {
     let mut byte = [0u8; 1];
     input.read_exact(&mut byte)?;
@@ -35,8 +35,7 @@ pub fn packfile_read<R: Read + BufRead + Seek, W: Write>(
 
     match obj_type {
         0...4 => {
-            input.read_exact(&mut [0u8; 2])?;
-            let mut deflated = DeflateDecoder::new(input);
+            let mut deflated = ZlibDecoder::new(input);
             std::io::copy(&mut deflated, output)?;
             return Ok(PackfileType::Plain(obj_type));
         },
@@ -52,9 +51,7 @@ pub fn packfile_read<R: Read + BufRead + Seek, W: Write>(
                 offset += u64::from(byte[0] & 0x7F);
             }
 
-            let mut zlib_header = [0u8; 2];
-            input.read_exact(&mut zlib_header)?;
-            let mut deflate_stream = DeflateDecoder::new(input);
+            let mut deflate_stream = ZlibDecoder::new(input);
             let mut instructions = Vec::new();
             deflate_stream.read_to_end(&mut instructions)?;
 
@@ -66,9 +63,7 @@ pub fn packfile_read<R: Read + BufRead + Seek, W: Write>(
             input.read_exact(&mut ref_bytes)?;
             let id = Id::from(&ref_bytes);
 
-            let mut zlib_header = [0u8; 2];
-            input.read_exact(&mut zlib_header)?;
-            let mut deflate_stream = DeflateDecoder::new(input);
+            let mut deflate_stream = ZlibDecoder::new(input);
             let mut instructions = Vec::new();
             deflate_stream.read_to_end(&mut instructions)?;
             return Ok(PackfileType::RefDelta((id, instructions)))

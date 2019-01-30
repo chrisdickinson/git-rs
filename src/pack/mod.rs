@@ -13,7 +13,7 @@ use crate::id::Id;
 pub mod mmap;
 pub mod any;
 pub mod iter;
-mod internal_type;
+pub mod internal_type;
 mod generic_read;
 
 #[derive(Debug)]
@@ -24,9 +24,22 @@ pub struct IndexEntry {
     next: usize
 }
 
+impl IndexEntry {
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    pub fn crc32(&self) -> u32 {
+        self.crc32
+    }
+
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+}
+
 pub struct Fanout ([u32; 256]);
 
 pub trait Packfile {
     fn read_bounds(&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)>;
-    fn entries(self) -> Result<iter::PackfileIterator>;
 }
