@@ -6,15 +6,18 @@ use std::io::Write;
 pub const OFS_DELTA: u8 = 6;
 pub const REF_DELTA: u8 = 7;
 
+#[derive(Debug)]
 struct CopyState {
     offset: usize,
     extent: usize
 }
 
+#[derive(Debug)]
 struct InsertState {
     extent: usize
 }
 
+#[derive(Debug)]
 enum DeltaDecoderState {
     NextCommand,
     Copy(CopyState),
@@ -22,6 +25,7 @@ enum DeltaDecoderState {
     Done
 }
 
+#[derive(Debug)]
 pub struct DeltaDecoderStream {
     state: DeltaDecoderState,
     instructions: Vec<u8>,
@@ -31,6 +35,7 @@ pub struct DeltaDecoderStream {
     written: usize
 }
 
+#[derive(Debug)]
 pub struct DeltaDecoder {
     instructions: Vec<u8>,
     inner: Vec<u8>,
