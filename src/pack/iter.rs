@@ -1,7 +1,8 @@
 use crypto::{ sha1::Sha1, digest::Digest };
 use std::io::{ BufRead, Seek, Read };
+use lru::LruCache;
 
-use crate::pack::generic_read::packfile_read;
+use crate::pack::generic_read::{ packfile_read, packfile_read_decompressed, Unpacked };
 use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::pack::IndexEntry;
@@ -15,8 +16,8 @@ pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug> {
     version: u32,
     object_count: u32,
     stream: R,
-    last_object: [Vec<u8>; 2],
-    last_object_type: [Type; 2],
+    buffer: Vec<u8>,
+    cache: LruCache<u64, Unpacked>,
     storage_set: Option<&'a StorageSet>
 }
 
@@ -46,9 +47,9 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug> PackfileIterator<'a, R> {
             index: 0,
             version,
             object_count,
-            last_object: [vec![], vec![]],
-            last_object_type: [Type::Blob, Type::Blob],
             storage_set,
+            buffer: Vec::new(),
+            cache: LruCache::new(4096),
             stream
         })
     }
@@ -63,78 +64,25 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<'a, 
         }
 
         self.index += 1;
-        let offset = self.stream.seek(std::io::SeekFrom::Current(0)).ok()?;
-        let current_object_idx = if self.index & 1 == 0 { 0 } else { 1 };
-        self.last_object[current_object_idx].clear();
-        let packfile_type = packfile_read(
+        self.buffer.clear();
+        let (offset, object_type) = packfile_read_decompressed(
             &mut self.stream,
-            &mut self.last_object[current_object_idx]
+            &mut self.buffer,
+            self.storage_set,
+            Some(&mut self.cache)
         ).ok()?;
 
-        let id = match packfile_type {
-            PackfileType::Plain(t) => {
-                let mut hash = Sha1::new();
+        let mut hash = Sha1::new();
+        hash.input(format!("{} {}\0", object_type.as_str(), self.buffer.len()).as_bytes());
+        hash.input(&(self.buffer)[..]);
+        let mut id_output = [0u8; 20];
+        hash.result(&mut id_output);
+        let id = Id::from(&id_output[..]);
 
-                let object_type: Type = PackfileType::Plain(t).into();
-
-                hash.input(format!("{} {}", object_type.as_str(), self.last_object[current_object_idx].len()).as_bytes());
-                hash.input(&[0u8]);
-                hash.input(&(self.last_object[current_object_idx])[..]);
-                self.last_object_type[current_object_idx] = object_type;
-                let mut id_output = [0u8; 20];
-                hash.result(&mut id_output);
-
-                Id::from(&id_output[..])
-            },
-
-            PackfileType::OffsetDelta((offset, instructions)) => {
-                let last_object_idx = if self.index & 1 == 0 { 1 } else { 0 };
-                self.last_object_type[current_object_idx] = self.last_object_type[last_object_idx];
-
-                let delta_decoder = DeltaDecoder::new(&instructions, self.last_object[last_object_idx].split_off(0)).ok()?;
-                let mut dds_stream: DeltaDecoderStream = delta_decoder.into();
-                dds_stream.read_to_end(&mut self.last_object[current_object_idx]).ok()?;
-                let mut hash = Sha1::new();
-
-                hash.input(self.last_object_type[current_object_idx].as_str().as_bytes());
-                hash.input(b" ");
-                hash.input(format!("{}", self.last_object[current_object_idx].len()).as_bytes());
-                hash.input(&[0u8]);
-                hash.input(&(self.last_object[current_object_idx])[..]);
-                let mut id_output = [0u8; 20];
-                hash.result(&mut id_output);
-
-                Id::from(&id_output[..])
-            },
-
-            PackfileType::RefDelta((id, instructions)) => {
-                let last_object_idx = if self.index & 1 == 0 { 1 } else { 0 };
-                self.last_object_type[current_object_idx] = self.last_object_type[last_object_idx];
-                if self.storage_set.is_none() {
-                    return None
-                }
-
-                let (_, mut base_stream) = self.storage_set.unwrap().get(&id).ok()??;
-
-                let mut base_buf = Vec::new();
-                base_stream.read_to_end(&mut self.last_object[last_object_idx]).ok()?;
-                let delta_decoder = DeltaDecoder::new(&instructions, base_buf).ok()?;
-                let mut dds_stream: DeltaDecoderStream = delta_decoder.into();
-                dds_stream.read_to_end(&mut self.last_object[current_object_idx]).ok()?;
-
-                let mut hash = Sha1::new();
-
-                hash.input(self.last_object_type[current_object_idx].as_str().as_bytes());
-                hash.input(b" ");
-                hash.input(format!("{}", self.last_object[current_object_idx].len()).as_bytes());
-                hash.input(&[0u8]);
-                hash.input(&(self.last_object[current_object_idx])[..]);
-                let mut id_output = [0u8; 20];
-                hash.result(&mut id_output);
-
-                Id::from(&id_output[..])
-            }
-        };
+        self.cache.put(offset, Unpacked::new(
+            object_type,
+            self.buffer.clone()
+        ));
 
         Some(IndexEntry {
             id,
