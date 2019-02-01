@@ -1,7 +1,6 @@
-use std::io::{ BufReader, SeekFrom };
-use flate2::bufread::DeflateDecoder;
 use std::io::prelude::*;
 use std::ops::Range;
+use std::io::Write;
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
@@ -41,5 +40,5 @@ impl IndexEntry {
 pub struct Fanout ([u32; 256]);
 
 pub trait Packfile {
-    fn read_bounds(&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)>;
+    fn read_bounds<W: Write>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet) -> Result<Type>;
 }

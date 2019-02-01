@@ -1,3 +1,5 @@
+use std::io::{ Cursor, Write };
+
 use crate::stores::{ Storage, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::packindex::Index;
@@ -26,15 +28,9 @@ impl<P: Packfile> Storage for Store<P> {
             None => return Ok(None)
         };
 
-        let (t, stream) = self.packfile.read_bounds(start, end, backends)?;
-        let typed = match t {
-            1 => Type::Commit,
-            2 => Type::Tree,
-            3 => Type::Blob,
-            4 => Type::Tag,
-            _ => return Err(ErrorKind::CorruptedPackfile.into())
-        };
+        let mut stream = Vec::new();
+        let obj_type = self.packfile.read_bounds(start, end, &mut stream, backends)?;
 
-        Ok(Some((typed, stream)))
+        Ok(Some((obj_type, Box::new(Cursor::new(stream)))))
     }
 }

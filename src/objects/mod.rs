@@ -21,6 +21,17 @@ pub enum Object {
     Tag(tag::Tag)
 }
 
+impl std::convert::Into<PackfileType> for Type {
+    fn into(self) -> PackfileType {
+        PackfileType::Plain(match self {
+            Type::Commit => 1,
+            Type::Tree => 2,
+            Type::Blob => 3,
+            Type::Tag => 4
+        })
+    }
+}
+
 impl std::convert::From<PackfileType> for Type {
     fn from(t: PackfileType) -> Type {
         match t {
