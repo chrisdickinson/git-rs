@@ -3,7 +3,7 @@ use std::ops::Range;
 use memmap::Mmap;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
-use crate::pack::generic_read::packfile_read_decompressed;
+use crate::pack::read::packfile_read_decompressed;
 use crate::pack::internal_type::PackfileType;
 use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };

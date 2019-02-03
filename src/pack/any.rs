@@ -5,7 +5,7 @@ use std::io::{ Cursor, Read, Write, Seek };
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
-use crate::pack::generic_read::packfile_read_decompressed;
+use crate::pack::read::packfile_read_decompressed;
 use crate::pack::internal_type::PackfileType;
 use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };

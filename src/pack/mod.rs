@@ -13,7 +13,7 @@ pub mod mmap;
 pub mod any;
 pub mod iter;
 pub mod internal_type;
-mod generic_read;
+mod read;
 
 #[derive(Debug)]
 pub struct IndexEntry {

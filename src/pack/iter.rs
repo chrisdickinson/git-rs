@@ -2,7 +2,7 @@ use crypto::{ sha1::Sha1, digest::Digest };
 use std::io::{ BufRead, Seek, Read };
 use lru::LruCache;
 
-use crate::pack::generic_read::{ packfile_read, packfile_read_decompressed, Unpacked };
+use crate::pack::read::{ packfile_read, packfile_read_decompressed, Unpacked };
 use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::pack::IndexEntry;

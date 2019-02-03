@@ -1,157 +1,189 @@
 use std::io::{ BufReader, SeekFrom };
-use flate2::bufread::DeflateDecoder;
+use flate2::bufread::ZlibDecoder;
 use std::io::prelude::*;
+use std::ops::Range;
+use lru::LruCache;
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
+use crate::pack::internal_type::PackfileType;
 use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
-use crate::packindex::Index;
 use crate::objects::Type;
 use crate::id::Id;
 
-pub type GetObject = Fn(&Id) -> Result<Option<(Type, Box<std::io::Read>)>>;
-
-pub struct Store<R> {
-    read: Box<Fn() -> Result<R>>,
-    index: Index
+pub struct Unpacked {
+    object_data: Vec<u8>,
+    object_type: Type
 }
 
-fn build_index(_reader: Box<std::io::Read>) -> Result<Index> {
-    Err(ErrorKind::NotImplemented.into())
+impl Unpacked {
+    pub fn new (object_type: Type, object_data: Vec<u8>) -> Unpacked {
+        Unpacked {
+            object_data,
+            object_type
+        }
+    }
 }
 
-impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
-    pub fn new<C>(func: C, index: Option<Index>) -> Result<Self>
-        where C: Fn() -> Result<R> + 'static {
+pub fn packfile_read<R: std::fmt::Debug + Read + BufRead + Seek, W: Write>(
+    input: &mut R,
+    output: &mut W
+) -> Result<PackfileType> {
+    let mut byte = [0u8; 1];
+    input.read_exact(&mut byte)?;
 
-        let idx = match index {
-            Some(xs) => xs,
-            None => build_index(Box::new(func()?))?
-        };
+    let obj_type = (byte[0] & 0x70) >> 4;
+    let mut size = (byte[0] & 0xf) as u64;
+    let mut count = 0;
+    let mut continuation = byte[0] & 0x80;
+    loop {
+        if continuation < 1 {
+            break
+        }
 
-        Ok(Store {
-            read: Box::new(func),
-            index: idx
-        })
+        input.read_exact(&mut byte)?;
+        continuation = byte[0] & 0x80;
+
+        size |= ((byte[0] & 0x7f) as u64) << (4 + 7 * count);
+        count += 1;
     }
 
-    pub fn read_bounds<Q: Queryable> (&self, start: u64, end: u64, backends: &StorageSet<Q>) -> Result<(u8, Box<std::io::Read>)> {
-        let handle = (self.read)()?;
-        let mut buffered_file = BufReader::new(handle);
-        buffered_file.seek(SeekFrom::Start(start))?;
+    match obj_type {
+        0...4 => {
+            let mut deflated = ZlibDecoder::new(input);
+            std::io::copy(&mut deflated, output)?;
+            return Ok(PackfileType::Plain(obj_type));
+        },
 
-        let stream = buffered_file.take(end - start);
+        OFS_DELTA => {
+            input.read_exact(&mut byte)?;
+            let mut offset = u64::from(byte[0] & 0x7F);
 
-        // type + size bytes
-        let mut continuation;
-        let mut size_vec = Vec::new();
-        let mut byte = [0u8; 1];
-
-        let mut take_one = stream.take(1);
-        take_one.read_exact(&mut byte)?;
-        let mut original_stream = take_one.into_inner();
-        continuation = byte[0] & 0x80;
-        let type_flag = (byte[0] & 0x70) >> 4;
-        size_vec.push(byte[0] & 0x0f);
-        loop {
-            if continuation < 1 {
-                break
+            while byte[0] & 0x80 > 0 {
+                offset += 1;
+                offset <<= 7;
+                input.read_exact(&mut byte)?;
+                offset += u64::from(byte[0] & 0x7F);
             }
 
-            take_one = original_stream.take(1);
-            take_one.read_exact(&mut byte)?;
-            original_stream = take_one.into_inner();
-            continuation = byte[0] & 0x80;
-            size_vec.push(byte[0] & 0x7f); 
+            let mut deflate_stream = ZlibDecoder::new(input);
+            let mut instructions = Vec::new();
+            deflate_stream.read_to_end(&mut instructions)?;
+
+            return Ok(PackfileType::OffsetDelta((offset, instructions)))
+        },
+
+        REF_DELTA => {
+            let mut ref_bytes = [0u8; 20];
+            input.read_exact(&mut ref_bytes)?;
+            let id = Id::from(&ref_bytes);
+
+            let mut deflate_stream = ZlibDecoder::new(input);
+            let mut instructions = Vec::new();
+            deflate_stream.read_to_end(&mut instructions)?;
+            return Ok(PackfileType::RefDelta((id, instructions)))
+        },
+
+        _ => {
+            Err(ErrorKind::BadLooseObject.into())
         }
-        let mut object_stream = original_stream;
+    }
+}
 
-        let count = size_vec.len();
-        let mut _size = match size_vec.pop() {
-            Some(xs) => u64::from(xs),
-            None => return Err(ErrorKind::CorruptedPackfile.into())
-        };
+macro_rules! dbgr {
+    ($val:expr) => {
+        match $val {
+            Ok(xs) => Ok(xs),
+            Err(tmp) => {
+                eprintln!("[{}:{}] {} = {:#?}",
+                    file!(), line!(), stringify!($val), &tmp);
+                Err(tmp)
+            }
+        }
+    }
+}
 
-        while !size_vec.is_empty() {
-            let next = match size_vec.pop() {
-                Some(xs) => u64::from(xs),
+pub fn packfile_read_decompressed<R: std::fmt::Debug + Read + BufRead + Seek, W: Write, S: Queryable>(
+    input: &mut R,
+    output: &mut W,
+    backends: Option<&StorageSet<S>>,
+    lru_cache: Option<&mut LruCache<u64, Unpacked>>
+) -> Result<(u64, Type)> {
+    let first_position = input.seek(std::io::SeekFrom::Current(0))?;
+
+    let packfile_type = packfile_read(input, output)?;
+    let object_type = match packfile_type {
+        PackfileType::Plain(t) => {
+            PackfileType::Plain(t).into()
+        },
+
+        PackfileType::OffsetDelta((offset, instructions)) => {
+            let mut intermediary = Vec::new();
+
+            let (lru_cache, has_cached_item) = match lru_cache {
+                Some(cache) => {
+                    let entry = cache.get(&(first_position - offset));
+                    match entry {
+                        Some(unpacked) => {
+                            (None, Some(unpacked))
+                        },
+                        None => {
+                            (Some(cache), None)
+                        }
+                    }
+                },
+                None => {
+                    (None, None)
+                }
+            };
+
+            let object_type = if let Some(unpacked) = has_cached_item {
+
+                intermediary.resize(unpacked.object_data.len(), 0u8);
+                intermediary.copy_from_slice(&unpacked.object_data[..]);
+
+                unpacked.object_type
+            } else {
+                let current_position = input.seek(std::io::SeekFrom::Current(0))?;
+                input.seek(std::io::SeekFrom::Start(first_position - offset));
+
+                let (_, output_type) = packfile_read_decompressed(
+                    input,
+                    &mut intermediary,
+                    backends,
+                    lru_cache
+                )?;
+
+                input.seek(std::io::SeekFrom::Start(current_position))?;
+                output_type
+            };
+
+
+            let delta_decoder = DeltaDecoder::new(&instructions, intermediary)?;
+            let mut stream: DeltaDecoderStream = delta_decoder.into();
+            std::io::copy(&mut stream, output);
+            object_type
+        },
+
+        PackfileType::RefDelta((id, instructions)) => {
+            if backends.is_none() {
+                return Err(ErrorKind::NeedStorageSet.into())
+            }
+
+            let (t, mut base_stream) = match backends.unwrap().get(&id)? {
+                Some((xs, stream)) => (xs, stream),
                 None => return Err(ErrorKind::CorruptedPackfile.into())
             };
-            _size |= next << (4 + 7 * (count - size_vec.len()));
+
+            let mut base_buf = Vec::new();
+            base_stream.read_to_end(&mut base_buf)?;
+            let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
+            let mut stream: DeltaDecoderStream = delta_decoder.into();
+            std::io::copy(&mut stream, output);
+            t
         }
+    };
 
-        match type_flag {
-            0...4 => {
-                let mut zlib_header = [0u8; 2];
-                object_stream.read_exact(&mut zlib_header)?;
-                Ok((type_flag, Box::new(DeflateDecoder::new(object_stream))))
-            },
-
-            OFS_DELTA => {
-                let mut take_one = object_stream.take(1);
-                take_one.read_exact(&mut byte)?;
-                let mut offset = u64::from(byte[0] & 0x7F);
-                let mut original_stream = take_one.into_inner();
-
-                while byte[0] & 0x80 > 0 {
-                    offset += 1;
-                    offset <<= 7;
-                    take_one = original_stream.take(1);
-                    take_one.read_exact(&mut byte)?;
-                    offset += u64::from(byte[0] & 0x7F);
-                    original_stream = take_one.into_inner();
-                }
-
-                let mut zlib_header = [0u8; 2];
-                original_stream.read_exact(&mut zlib_header)?;
-                let mut deflate_stream = DeflateDecoder::new(original_stream);
-                let mut instructions = Vec::new();
-                deflate_stream.read_to_end(&mut instructions)?;
-
-                let (base_type, mut stream) = self.read_bounds(start - offset, start, backends)?;
-                let mut base_buf = Vec::new();
-
-                stream.read_to_end(&mut base_buf)?;
-                let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
-                let dd_stream: DeltaDecoderStream = delta_decoder.into();
-                Ok((base_type, Box::new(dd_stream)))
-            },
-
-            REF_DELTA => {
-                let mut ref_bytes = [0u8; 20];
-                object_stream.read_exact(&mut ref_bytes)?;
-                let id = Id::from(&ref_bytes);
-
-                let mut zlib_header = [0u8; 2];
-                object_stream.read_exact(&mut zlib_header)?;
-                let mut deflate_stream = DeflateDecoder::new(object_stream);
-                let mut instructions = Vec::new();
-                deflate_stream.read_to_end(&mut instructions)?;
-
-                let (t, mut base_stream) = match backends.get(&id)? {
-                    Some((xs, stream)) => match xs {
-                        Type::Commit => (1, stream),
-                        Type::Tree => (2, stream),
-                        Type::Blob => (3, stream),
-                        Type::Tag => (4, stream)
-                    },
-                    None => return Err(ErrorKind::CorruptedPackfile.into())
-                };
-
-                let mut base_buf = Vec::new();
-
-                base_stream.read_to_end(&mut base_buf)?;
-
-
-                let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
-                let stream: DeltaDecoderStream = delta_decoder.into();
-                Ok((t, Box::new(stream)))
-            },
-
-            _ => {
-                Err(ErrorKind::BadLooseObject.into())
-            }
-        }
-    }
+    Ok((first_position, object_type))
 }
