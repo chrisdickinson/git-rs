@@ -4,7 +4,7 @@ use std::io::Write;
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::id::Id;
@@ -40,5 +40,5 @@ impl IndexEntry {
 pub struct Fanout ([u32; 256]);
 
 pub trait Packfile {
-    fn read_bounds<W: Write>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet) -> Result<Type>;
+    fn read_bounds<W: Write, S: Queryable>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet<S>) -> Result<Type>;
 }

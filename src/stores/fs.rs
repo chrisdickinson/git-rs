@@ -1,21 +1,24 @@
 use crate::stores::loose::{ Store as LooseStore };
 use crate::pack::mmap::Reader as MmapPackReader;
 use crate::stores::pack::{ Store as PackStore };
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::pack::mmap::Reader;
 use crate::packindex::Index;
 use memmap::MmapOptions;
 
 use std::path::Path;
 
-pub fn from(path: &Path) -> Result<StorageSet, std::io::Error> {
-    let mut backends = Vec::new();
-    packfiles_from_path(path, &mut backends)?;
-    loose_from_path(path, &mut backends)?;
-    Ok(StorageSet::new(backends))
+pub fn from(path: &Path) -> Result<StorageSet<(Vec<PackStore<MmapPackReader>>, LooseStore)>, std::io::Error> {
+    let packfiles = packfiles_from_path(path)?;
+    let loose = loose_from_path(path)?;
+
+    Ok(StorageSet::new((
+        packfiles,
+        loose
+    )))
 }
 
-pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Result<(), std::io::Error> {
+pub fn loose_from_path(path: &Path) -> Result<LooseStore, std::io::Error> {
     let mut root = std::path::PathBuf::new();
     root.push(path);
     root.push(".git");
@@ -52,11 +55,11 @@ pub fn loose_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Result<()
         }
     }, Some(filter));
 
-    stores.push(Box::new(loose_store));
-    Ok(())
+    Ok(loose_store)
 }
 
-pub fn packfiles_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Result<(), std::io::Error> {
+pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>, std::io::Error> {
+    let mut stores = vec![];
     let mut root = std::path::PathBuf::new();
     root.push(path);
     root.push(".git");
@@ -88,8 +91,8 @@ pub fn packfiles_from_path(path: &Path, stores: &mut Vec<Box<Storage>>) -> Resul
         let file = std::fs::File::open(epb.as_path())?;
         let mmap = unsafe { MmapOptions::new().map(&file)? };
         let packfile = MmapPackReader::new(mmap);
-        stores.push(Box::new(PackStore::new(packfile, idx)));
+        stores.push(PackStore::new(packfile, idx));
     }
 
-    Ok(())
+    Ok(stores)
 }

@@ -1,6 +1,6 @@
 use std::io::{ Cursor, Write };
 
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::packindex::Index;
 use crate::pack::Packfile;
@@ -21,16 +21,15 @@ impl<P: Packfile> Store<P> {
     }
 }
 
-impl<P: Packfile> Storage for Store<P> {
-    fn get(&self, id: &Id, backends: &StorageSet) -> Result<Option<(Type, Box<std::io::Read>)>> {
+impl<P: Packfile> Queryable for Store<P> {
+    fn get<W: Write, S: Queryable>(&self, id: &Id, output: &mut W, backends: &StorageSet<S>) -> Result<Option<Type>> {
         let (start, end) = match self.index.get_bounds(&id) {
             Some(xs) => xs,
             None => return Ok(None)
         };
 
-        let mut stream = Vec::new();
-        let obj_type = self.packfile.read_bounds(start, end, &mut stream, backends)?;
+        let obj_type = self.packfile.read_bounds(start, end, output, backends)?;
 
-        Ok(Some((obj_type, Box::new(Cursor::new(stream)))))
+        Ok(Some(obj_type))
     }
 }

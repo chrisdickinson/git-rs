@@ -8,21 +8,21 @@ use crate::objects::Type;
 use crate::pack::IndexEntry;
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream };
 use crate::pack::internal_type::PackfileType;
-use crate::stores::StorageSet;
+use crate::stores::{ Queryable, StorageSet };
 use crate::id::Id;
 
-pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug> {
+pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> {
     index: u32,
     version: u32,
     object_count: u32,
     stream: R,
     buffer: Vec<u8>,
     cache: LruCache<u64, Unpacked>,
-    storage_set: Option<&'a StorageSet>
+    storage_set: Option<&'a StorageSet<S>>
 }
 
-impl<'a, R: BufRead + Seek + std::fmt::Debug> PackfileIterator<'a, R> {
-    pub fn new(mut stream: R, storage_set: Option<&'a StorageSet>) -> Result<Self> {
+impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a, R, S> {
+    pub fn new(mut stream: R, storage_set: Option<&'a StorageSet<S>>) -> Result<Self> {
         let mut magic = [0u8; 4];
         stream.read_exact(&mut magic)?;
 
@@ -55,7 +55,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug> PackfileIterator<'a, R> {
     }
 }
 
-impl<'a, R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<'a, R> {
+impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for PackfileIterator<'a, R, S> {
     type Item = IndexEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -101,7 +101,9 @@ mod tests {
     #[test]
     fn does_it_blend() {
         let packfile = include_bytes!("../../fixtures/packfile");
-        for entry in PackfileIterator::new(Cursor::new(&packfile[..]), None).expect("failed to parse") {
+
+        let packfile_iter: PackfileIterator<_, ()> = PackfileIterator::new(Cursor::new(&packfile[..]), None).expect("failed to parse");
+        for entry in packfile_iter {
             println!("entry: {:?}", entry);
         }
     }

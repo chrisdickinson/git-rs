@@ -7,7 +7,7 @@ use std;
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
 use crate::pack::generic_read::packfile_read_decompressed;
 use crate::pack::internal_type::PackfileType;
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::iter::PackfileIterator;
 use crate::pack::Packfile;
@@ -31,12 +31,12 @@ impl<R: Read + Seek + 'static> Reader<R> {
 }
 
 impl<R: Read + Seek + std::fmt::Debug> Packfile for Reader<R> {
-    fn read_bounds<W: Write>(
+    fn read_bounds<W: Write, S: Queryable>(
         &self,
         start: u64,
         end: u64,
         output: &mut W,
-        backends: &StorageSet
+        backends: &StorageSet<S>
     ) -> Result<Type> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);

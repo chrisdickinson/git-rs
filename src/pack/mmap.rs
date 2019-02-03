@@ -5,9 +5,9 @@ use memmap::Mmap;
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
 use crate::pack::generic_read::packfile_read_decompressed;
 use crate::pack::internal_type::PackfileType;
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::iter::PackfileIterator;
-use crate::stores::StorageSet;
 use crate::packindex::Index;
 use crate::pack::Packfile;
 use crate::objects::Type;
@@ -26,7 +26,7 @@ impl Reader {
 }
 
 impl Packfile for Reader {
-    fn read_bounds<W: Write>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet) -> Result<Type> {
+    fn read_bounds<W: Write, S: Queryable>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet<S>) -> Result<Type> {
         let mut cursor = std::io::Cursor::new(&self.mmap[ .. end as usize]);
         cursor.seek(std::io::SeekFrom::Start(start))?;
 

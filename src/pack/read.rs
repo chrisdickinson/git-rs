@@ -4,7 +4,7 @@ use std::io::prelude::*;
 use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::packindex::Index;
 use crate::objects::Type;
@@ -36,7 +36,7 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         })
     }
 
-    pub fn read_bounds (&self, start: u64, end: u64, backends: &StorageSet) -> Result<(u8, Box<std::io::Read>)> {
+    pub fn read_bounds<Q: Queryable> (&self, start: u64, end: u64, backends: &StorageSet<Q>) -> Result<(u8, Box<std::io::Read>)> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
@@ -155,58 +155,3 @@ impl<R: std::io::Read + std::io::Seek + 'static> Store<R> {
         }
     }
 }
-
-
-impl<R: std::io::Read + std::io::Seek + 'static> Storage for Store<R> {
-    fn get(&self, id: &Id, backends: &StorageSet) -> Result<Option<(Type, Box<std::io::Read>)>> {
-        let (start, end) = match self.index.get_bounds(&id) {
-            Some(xs) => xs,
-            None => return Ok(None)
-        };
-
-        let (t, stream) = self.read_bounds(start, end, backends)?;
-        let typed = match t {
-            1 => Type::Commit,
-            2 => Type::Tree,
-            3 => Type::Blob,
-            4 => Type::Tag,
-            _ => return Err(ErrorKind::CorruptedPackfile.into())
-        };
-
-        Ok(Some((typed, stream)))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::Index;
-    use super::Store;
-    use super::Id;
-    use std::io::Cursor;
-    use crate::objects::Object;
-    use crate::stores::{ Storage, StorageSet };
-
-    #[test]
-    fn can_load() {
-        let bytes = include_bytes!("../../fixtures/pack_index");
-
-        let idx = Index::from(&mut bytes.as_ref()).expect("bad index");
-        let pack = Store::new(|| Ok(Cursor::new(include_bytes!("../../fixtures/packfile") as &[u8])), Some(idx)).expect("bad packfile");
-        let storage_set = StorageSet::new(Vec::new());
-
-        let id: Id = "872e26b3fbebe64a2a85b271fed6916b964b4fde".parse().unwrap();
-        let (kind, mut stream) = pack.get(&id, &storage_set).expect("failure").unwrap();
-
-        let obj = kind.load(&mut stream).expect("failed to load object");
-
-        match obj {
-            Object::Commit(commit) => {
-                let msg = std::str::from_utf8(commit.message()).expect("invalid string");
-                assert_eq!(msg, "ok\n");
-            },
-            _ => panic!("expected commit")
-        };
-    }
-}
-

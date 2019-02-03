@@ -7,7 +7,7 @@ use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
 use crate::pack::internal_type::PackfileType;
-use crate::stores::{ Storage, StorageSet };
+use crate::stores::{ Queryable, StorageSet };
 use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::id::Id;
@@ -104,10 +104,10 @@ macro_rules! dbgr {
     }
 }
 
-pub fn packfile_read_decompressed<R: std::fmt::Debug + Read + BufRead + Seek, W: Write>(
+pub fn packfile_read_decompressed<R: std::fmt::Debug + Read + BufRead + Seek, W: Write, S: Queryable>(
     input: &mut R,
     output: &mut W,
-    backends: Option<&StorageSet>,
+    backends: Option<&StorageSet<S>>,
     lru_cache: Option<&mut LruCache<u64, Unpacked>>
 ) -> Result<(u64, Type)> {
     let first_position = input.seek(std::io::SeekFrom::Current(0))?;

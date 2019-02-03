@@ -22,7 +22,7 @@ Rust" (Blandy, Orendorff).
 - [x] Create iterator for walking trees
     - [ ] Materialize trees to disk (post gitindex?)
 - [ ] Create index from packfile
-    - [ ] Rename `Storage` trait to `Queryable`
+    - [x] Rename `Storage` trait to `Queryable`
     - [ ] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
 - [ ] Load packed-refs
 - [ ] Create interface for writing new objects

@@ -4,18 +4,18 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 use crate::objects::tree::{ TreeEntry, FileMode };
+use crate::stores::{ StorageSet, Queryable };
 use crate::objects::blob::Blob;
-use crate::stores::StorageSet;
 use crate::objects::Object;
 
-pub struct TreeIterator<'a> {
-    storage_set: &'a StorageSet,
+pub struct TreeIterator<'a, S: Queryable> {
+    storage_set: &'a StorageSet<S>,
     layers: Vec<IntoIter<Vec<u8>, TreeEntry>>,
     path_segments: PathBuf
 }
 
-impl<'a> TreeIterator<'a> {
-    pub fn new(storage_set: &'a StorageSet, layers: Vec<IntoIter<Vec<u8>, TreeEntry>>) -> TreeIterator {
+impl<'a, S: Queryable> TreeIterator<'a, S> {
+    pub fn new(storage_set: &'a StorageSet<S>, layers: Vec<IntoIter<Vec<u8>, TreeEntry>>) -> TreeIterator<S> {
         TreeIterator {
             path_segments: PathBuf::from("."),
             storage_set,
@@ -24,7 +24,7 @@ impl<'a> TreeIterator<'a> {
     }
 }
 
-impl<'a> Iterator for TreeIterator<'a> {
+impl<'a, S: Queryable> Iterator for TreeIterator<'a, S> {
     type Item = (PathBuf, FileMode, Blob);
 
     fn next(&mut self) -> Option<Self::Item> {

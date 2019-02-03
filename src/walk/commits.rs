@@ -1,7 +1,7 @@
 use std::collections::{ HashSet, BinaryHeap };
 
+use crate::stores::{ Queryable, StorageSet };
 use crate::objects::commit::Commit;
-use crate::stores::StorageSet;
 use crate::objects::Object;
 use crate::id::Id;
 
@@ -34,14 +34,14 @@ impl std::cmp::PartialEq for IdCommit {
 
 impl std::cmp::Eq for IdCommit { }
 
-pub struct CommitIterator<'a> {
-    storage_set: &'a StorageSet,
+pub struct CommitIterator<'a, S: Queryable> {
+    storage_set: &'a StorageSet<S>,
     seen: HashSet<Id>,
     target: BinaryHeap<IdCommit>
 }
 
-impl<'a> CommitIterator<'a> {
-    pub fn new(storage_set: &'a StorageSet, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<'a> {
+impl<'a, S: Queryable> CommitIterator<'a, S> {
+    pub fn new(storage_set: &'a StorageSet<S>, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<'a, S> {
         let mut seen = seen.unwrap_or_else(HashSet::<Id>::new);
 
         let first = storage_set.get_and_load(id).ok()
@@ -64,7 +64,7 @@ impl<'a> CommitIterator<'a> {
     }
 }
 
-impl<'a> Iterator for CommitIterator<'a> {
+impl<'a, S: Queryable> Iterator for CommitIterator<'a, S> {
     type Item = (Id, Commit);
 
     fn next(&mut self) -> Option<Self::Item> {
