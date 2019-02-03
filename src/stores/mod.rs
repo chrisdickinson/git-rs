@@ -6,7 +6,6 @@ use crate::objects::{Type, Object};
 use crate::errors::Result;
 use crate::id::Id;
 
-pub mod mmap_pack;
 pub mod loose;
 pub mod pack;
 pub mod fs;
