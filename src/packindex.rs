@@ -1,6 +1,8 @@
 use byteorder::{ BigEndian, ReadBytesExt };
 use flate2::bufread::DeflateDecoder;
 use crypto::{ sha1::Sha1, digest::Digest };
+use std::convert::AsMut;
+use std::iter::Iterator;
 use std::io::{ Read, Seek };
 use std;
 
@@ -56,7 +58,15 @@ impl Index {
         self.objects.as_slice()
     }
 
-    pub fn from<T: std::io::Read>(mut stream: T) -> Result<Index> {
+    pub fn new<T: Iterator<Item=IndexEntry>>(entries: T) -> Result<Self> {
+        for entry in entries {
+            println!("hi hi");
+        }
+
+        Err(ErrorKind::NotImplemented.into())
+    }
+
+    pub fn from<T: std::io::Read>(mut stream: T) -> Result<Self> {
         let mut magic = [0u8; 4];
         stream.read_exact(&mut magic)?;
         let mut version = [0u8; 4];

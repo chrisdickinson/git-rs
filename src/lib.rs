@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate error_chain;
 
+mod crc;
 pub mod id;
 pub mod delta;
 pub mod errors;
