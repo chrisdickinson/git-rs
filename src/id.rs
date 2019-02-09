@@ -66,6 +66,19 @@ impl fmt::Display for Id {
     }
 }
 
+impl std::cmp::Ord for Id {
+    fn cmp(&self, other: &Id) -> std::cmp::Ordering {
+        self.bytes.cmp(&other.bytes)
+    }
+}
+
+
+impl std::convert::From<[u8; 20]> for Id {
+    fn from(bytes: [u8; 20]) -> Id {
+        Id { bytes }
+    }
+}
+
 impl Id {
     pub fn from(bytes: &[u8]) -> Id {
         let mut id = Id::default();

@@ -84,7 +84,8 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
             let mut id_output = [0u8; 20];
             hash.result(&mut id_output);
-            Some(Id::from(&id_output[..]))
+            let id: Id = id_output.into();
+            Some(id)
         } else {
             None
         };
