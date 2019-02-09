@@ -23,7 +23,10 @@ Rust" (Blandy, Orendorff).
     - [ ] Materialize trees to disk (post gitindex?)
 - [ ] Create index from packfile
     - [x] Rename `Storage` trait to `Queryable`
-    - [ ] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
+    - [x] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
+        - [ ] Carry the rework out through `StorageSet`
+    - [x] Create the index
+    - [x] Wrap it in a nice API
 - [ ] Load packed-refs
 - [ ] Create interface for writing new objects
 - [ ] `.git/index` support

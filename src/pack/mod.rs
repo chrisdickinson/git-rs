@@ -6,6 +6,7 @@ use crate::errors::Result;
 use crate::objects::Type;
 use crate::id::Id;
 
+pub mod index;
 pub mod mmap;
 pub mod any;
 pub mod iter;
