@@ -29,5 +29,5 @@ name = "git_rs_read_tree"
 path = "src/bin/read_tree.rs"
 
 [[bin]]
-name = "git_rs_list_pack"
-path = "src/bin/list_pack.rs"
+name = "git_rs_index_pack"
+path = "src/bin/index_pack.rs"
