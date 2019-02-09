@@ -1,15 +1,10 @@
 use std::io::{ BufReader, SeekFrom };
-use flate2::bufread::DeflateDecoder;
-use std::io::prelude::*;
-use std::io::{ Cursor, Read, Write, Seek };
+use std::io::{ Read, Write, Seek };
 use std;
 
-use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
-use crate::pack::read::packfile_read_decompressed;
-use crate::pack::internal_type::PackfileType;
 use crate::stores::{ Queryable, StorageSet };
-use crate::errors::{ Result, ErrorKind };
-use crate::pack::iter::PackfileIterator;
+use crate::pack::read::packfile_read;
+use crate::errors::Result;
 use crate::pack::Packfile;
 use crate::objects::Type;
 use crate::id::Id;
@@ -40,9 +35,15 @@ impl<R: Read + Seek + std::fmt::Debug> Packfile for Reader<R> {
     ) -> Result<Type> {
         let handle = (self.read)()?;
         let mut buffered_file = BufReader::new(handle);
-        let mut output = Vec::new();
         buffered_file.seek(SeekFrom::Start(start))?;
-        let (_, obj_type) = packfile_read_decompressed(&mut buffered_file, &mut output, Some(backends), None)?;
+
+        let packfile_type = packfile_read(&mut buffered_file, output, &mut 0)?;
+        let obj_type = packfile_type.decompress(
+            start,
+            &mut buffered_file,
+            output,
+            Some(backends)
+        )?;
         Ok(obj_type)
     }
 }

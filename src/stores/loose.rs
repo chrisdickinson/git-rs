@@ -116,7 +116,7 @@ impl Queryable for Store {
             &_ => return Err(ErrorKind::BadLooseObject.into())
         };
 
-        std::io::copy(&mut output_stream, output);
+        std::io::copy(&mut output_stream, output)?;
         Ok(Some(loaded_type))
     }
 }

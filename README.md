@@ -42,6 +42,31 @@ Rust" (Blandy, Orendorff).
 
 ## PLAN
 
+### 2019-02-08 Update
+
+- **It's been a minute!**
+- As you might have seen, figuring out packfile indexing has forced a lot of changes on the repo.
+    - There's now a `src/pack/read.rs` file that holds generic read implementations for any `BufRead + Seek`.
+    - The signature of the `Storage` trait changed -- instead of returning a boxed read object, it now accepts
+      a `Write` destination.
+    - Further, `Storage` is now `Queryable` (a better name!).
+        - Because we moved from returning a Box to accepting generic `Write`, we could no longer box `Queryable`s.
+            - I didn't know this about Rust, so TIL!
+        - `StorageSet` objects had to be rethought as a result -- they could no longer contain Box'd `Storage` objects.
+            - Instead, we put the compiler to work -- because storage sets are known at compile time, I implemented
+              `Queryable` for the unit type, `()`, two types `(S, T)`, and arrays of single types `Vec<T>`.
+            - This means that a `StorageSet` may hold a single, top-level `Queryable`, which might contain nested
+              heterogenous `Queryable` definitions.
+                - It gives me warm, fuzzy feelings :revolving_hearts:
+- You might also note that we're _not actually done_ indexing packfiles. :scream:
+    - Here's the sitch: in order to create a packfile index, you have to run a CRC32 over the
+      **compressed** bytes in the packfile.
+    - The `ZlibDecoder` will pull more bytes from the underlying stream than it needs, so you can't take
+      the route of handing it a `CrcReader` and get good results.
+    - It's got to be a multi-pass deal.
+        - The current plan is: run one pass to get offsets, un-delta'd shas and types.
+        - Run a second pass to resolve CRCs and decompress deltas. This can be done in parallel.
+
 ### 2019-01-23 Update
 
 - It's time to start indexing packfiles.

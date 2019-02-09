@@ -1,8 +1,8 @@
-use std::io::{ Cursor, Write };
+use std::io::Write;
 
 use crate::stores::{ Queryable, StorageSet };
-use crate::errors::{ Result, ErrorKind };
 use crate::packindex::Index;
+use crate::errors::Result;
 use crate::pack::Packfile;
 use crate::objects::Type;
 use crate::id::Id;

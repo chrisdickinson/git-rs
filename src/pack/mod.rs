@@ -1,11 +1,8 @@
-use std::io::prelude::*;
-use std::ops::Range;
 use std::io::Write;
 use std;
 
-use crate::delta::{ DeltaDecoder, DeltaDecoderStream, OFS_DELTA, REF_DELTA };
 use crate::stores::{ Queryable, StorageSet };
-use crate::errors::{ Result, ErrorKind };
+use crate::errors::Result;
 use crate::objects::Type;
 use crate::id::Id;
 

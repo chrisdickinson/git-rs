@@ -42,14 +42,12 @@ impl std::convert::From<PackfileType> for Type {
                     3 => Type::Blob,
                     4 => Type::Tag,
                     _ => {
-                        panic!("Unknown packfile type");
-                        return Type::Tag
+                        panic!("Unknown packfile type")
                     }
                 }
             },
             _ => {
-                panic!("Cannot convert delta packfile type to external type");
-                return Type::Tag
+                panic!("Cannot convert delta packfile type to external type")
             }
         }
     }

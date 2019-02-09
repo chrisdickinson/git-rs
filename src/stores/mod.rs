@@ -16,7 +16,7 @@ pub trait Queryable {
 }
 
 impl Queryable for () {
-    fn get<W: Write, S: Queryable>(&self, id: &Id, output: &mut W, backends: &StorageSet<S>) -> Result<Option<Type>> {
+    fn get<W: Write, S: Queryable>(&self, id: &Id, _output: &mut W, _backends: &StorageSet<S>) -> Result<Option<Type>> {
         Ok(None)
     }
 }

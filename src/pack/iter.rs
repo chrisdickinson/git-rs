@@ -1,23 +1,18 @@
 use crypto::{ sha1::Sha1, digest::Digest };
-use std::io::{ BufRead, Seek, Read };
-use lru::LruCache;
+use std::io::{ BufRead, Seek, Write };
 
-use crate::pack::read::{ packfile_read, packfile_read_decompressed, Unpacked };
-use crate::errors::{ Result, ErrorKind };
-use crate::objects::Type;
-use crate::pack::IndexEntry;
-use crate::delta::{ DeltaDecoder, DeltaDecoderStream };
-use crate::pack::internal_type::PackfileType;
 use crate::stores::{ Queryable, StorageSet };
+use crate::errors::{ Result, ErrorKind };
+use crate::pack::read::packfile_read;
 use crate::id::Id;
 
 pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> {
     index: u32,
-    version: u32,
     object_count: u32,
     stream: R,
     buffer: Vec<u8>,
-    cache: LruCache<u64, Unpacked>,
+    header_buffer: Vec<u8>,
+    current_offset: u64,
     storage_set: Option<&'a StorageSet<S>>
 }
 
@@ -45,18 +40,21 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
 
         Ok(PackfileIterator {
             index: 0,
-            version,
             object_count,
             storage_set,
-            buffer: Vec::new(),
-            cache: LruCache::new(4096),
+            current_offset: 12,
+            buffer: Vec::with_capacity(65535),
+            header_buffer: Vec::with_capacity(128),
             stream
         })
     }
 }
 
+use crate::pack::internal_type::PackfileType;
+use crate::objects::Type;
+
 impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for PackfileIterator<'a, R, S> {
-    type Item = IndexEntry;
+    type Item = (u64, PackfileType, Option<Id>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.object_count {
@@ -65,31 +63,33 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
         self.index += 1;
         self.buffer.clear();
-        let (offset, object_type) = packfile_read_decompressed(
+
+        let offset = self.current_offset;
+        let mut bytes_read = 0;
+        let packfile_type = packfile_read(
             &mut self.stream,
             &mut self.buffer,
-            self.storage_set,
-            Some(&mut self.cache)
+            &mut bytes_read
         ).ok()?;
 
-        let mut hash = Sha1::new();
-        hash.input(format!("{} {}\0", object_type.as_str(), self.buffer.len()).as_bytes());
-        hash.input(&(self.buffer)[..]);
-        let mut id_output = [0u8; 20];
-        hash.result(&mut id_output);
-        let id = Id::from(&id_output[..]);
+        self.current_offset += bytes_read;
 
-        self.cache.put(offset, Unpacked::new(
-            object_type,
-            self.buffer.clone()
-        ));
+        let id = if let PackfileType::Plain(ident) = packfile_type {
+            let object_type: Type = PackfileType::Plain(ident).into();
+            let mut hash = Sha1::new();
+            self.header_buffer.clear();
+            write!(&mut self.header_buffer, "{} {}\0", object_type.as_str(), self.buffer.len()).ok()?;
+            hash.input(&(self.header_buffer)[..]);
+            hash.input(&(self.buffer)[..]);
 
-        Some(IndexEntry {
-            id,
-            offset,
-            crc32: 0xdeadbeef, // dunno what we're crc'ing, yet.
-            next: 0
-        })
+            let mut id_output = [0u8; 20];
+            hash.result(&mut id_output);
+            Some(Id::from(&id_output[..]))
+        } else {
+            None
+        };
+
+        Some((offset, packfile_type, id))
     }
 }
 

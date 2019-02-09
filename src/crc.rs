@@ -1,10 +1,17 @@
-use crc::crc32::Digest;
 use std::hash::Hasher;
-use std::io::Read;
+use crc::crc32::Digest;
+use std::io::{ Read, SeekFrom };
+use std::fmt::Debug;
 
 struct CRCReader<R: Read> {
     inner: R,
     digest: Digest
+}
+
+impl<R: Read + Debug> Debug for CRCReader<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
 }
 
 impl<R: Read> CRCReader<R> {
@@ -26,13 +33,6 @@ impl<R: Read> CRCReader<R> {
 
 impl<R: Read> Read for CRCReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
-        let written = self.inner.read(buf)?;
-        if written > 0 {
-            self.digest.write(&buf[buf.len() - written ..]);
-        } else if buf.len() == 0 {
-            self.digest.finish();
-        }
-
-        Ok(written)
+        self.inner.read(buf)
     }
 }

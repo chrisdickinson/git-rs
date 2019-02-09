@@ -1,8 +1,7 @@
 use crate::stores::loose::{ Store as LooseStore };
 use crate::pack::mmap::Reader as MmapPackReader;
 use crate::stores::pack::{ Store as PackStore };
-use crate::stores::{ Queryable, StorageSet };
-use crate::pack::mmap::Reader;
+use crate::stores::StorageSet;
 use crate::packindex::Index;
 use memmap::MmapOptions;
 
