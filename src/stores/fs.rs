@@ -1,8 +1,8 @@
 use crate::stores::loose::{ Store as LooseStore };
+use crate::pack::index::{ read as read_packidx };
 use crate::pack::mmap::Reader as MmapPackReader;
 use crate::stores::pack::{ Store as PackStore };
 use crate::stores::StorageSet;
-use crate::packindex::Index;
 use memmap::MmapOptions;
 
 use std::path::Path;
@@ -78,14 +78,16 @@ pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>
         }
 
         let entry_path = entry.path();
-        let idx = match Index::from(std::fs::File::open(entry_path.clone())?) {
+
+        let index_file = std::fs::File::open(entry_path.clone())?;
+        let index_mmap = unsafe { MmapOptions::new().map(&index_file)? };
+        let idx = match read_packidx(std::io::Cursor::new(index_mmap)) {
             Ok(xs) => xs,
             Err(_) => return Err(std::io::ErrorKind::InvalidData.into())
         };
 
         let mut epb = entry_path.to_path_buf();
         epb.set_extension("pack");
-
 
         let file = std::fs::File::open(epb.as_path())?;
         let mmap = unsafe { MmapOptions::new().map(&file)? };

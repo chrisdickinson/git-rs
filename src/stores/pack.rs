@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::stores::{ Queryable, StorageSet };
-use crate::packindex::Index;
+use crate::pack::index::Index;
 use crate::errors::Result;
 use crate::pack::Packfile;
 use crate::objects::Type;

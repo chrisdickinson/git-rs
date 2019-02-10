@@ -12,6 +12,9 @@ error_chain! {
         BadLooseObject
         NotImplemented
         CorruptedPackfile
+        InvalidPackfileIndex
+        UnsupportedPackfileIndexVersion
+        CorruptedPackfileIndex
         NeedStorageSet
     }
 }

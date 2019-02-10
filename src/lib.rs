@@ -7,7 +7,6 @@ pub mod errors;
 pub mod stores;
 pub mod objects;
 pub mod pack;
-pub mod packindex;
 pub mod refs;
 pub mod walk;
 pub mod identity;
