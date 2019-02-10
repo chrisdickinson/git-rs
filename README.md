@@ -21,17 +21,19 @@ Rust" (Blandy, Orendorff).
 - [x] Create iterator for walking commit graph
 - [x] Create iterator for walking trees
     - [ ] Materialize trees to disk (post gitindex?)
-- [ ] Create index from packfile
+- [x] Create index from packfile
     - [x] Rename `Storage` trait to `Queryable`
     - [x] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
-        - [ ] Carry the rework out through `StorageSet`
+        - [x] Carry the rework out through `StorageSet`
     - [x] Create the index
     - [x] Wrap it in a nice API
-- [ ] Load packed-refs
-- [ ] Create interface for writing new objects
+- [ ] refs v2
+    - [ ] Load refs on demand
+    - [ ] Load packed-refs
 - [ ] `.git/index` support
     - [ ] Read git index cache
     - [ ] Write git index cache
+- [ ] Create interface for writing new objects
 - [ ] Add benchmarks
 - [ ] Create packfile from list of objects (API TKTK)
 - [ ] Network protocol

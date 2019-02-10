@@ -1,4 +1,4 @@
-use flate2::bufread::DeflateDecoder;
+use flate2::bufread::ZlibDecoder;
 use std::io::prelude::*;
 use std::io::{ BufReader };
 
@@ -40,27 +40,9 @@ impl Queryable for Store {
             return Ok(None)
         }
 
-        let reader = BufReader::new(maybe_reader.unwrap());
-        let mut sig_handle = reader.take(2);
-        let mut sig_bytes = [0u8; 2];
-
-        sig_handle.read_exact(&mut sig_bytes)?;
-
-        let w0 = u16::from(sig_bytes[0]);
-        let w1 = u16::from(sig_bytes[1]);
-        let word = (w0 << 8) + w1;
-
-        let file_after_sig = sig_handle.into_inner();
-
-        // !!! next step is:
-        // check to see is_zlib = w0 === 0x78 && !(word % 31)
-        // then "commit" | "tree" | "blob" | "tag" SP SIZE NUL body
-        let is_deflate = w0 == 0x78 && ((word & 31) != 0);
-        let decoder_handle: Box<std::io::Read> = if is_deflate {
-            Box::new(DeflateDecoder::new(file_after_sig))
-        } else {
-            Box::new(file_after_sig)
-        };
+        let mut reader = BufReader::new(
+            ZlibDecoder::new(BufReader::new(maybe_reader.unwrap()))
+        );
 
         let mut type_vec = Vec::new();
         let mut size_vec = Vec::new();
@@ -70,53 +52,18 @@ impl Queryable for Store {
         };
         let mut mode = Mode::FindSpace;
 
-        let mut header_handle = decoder_handle;
-        loop {
-            // XXX(chrisdickinson): how long should we loop for until we give up?
-            let mut next_handle = header_handle.take(1);
-            let mut header_byte = [0u8; 1];
-            next_handle.read_exact(&mut header_byte)?;
+        reader.read_until(0x20, &mut type_vec);
+        reader.read_until(0, &mut size_vec);
 
-            let next = match mode {
-                Mode::FindSpace => {
-                    match header_byte[0] {
-                        0x20 => {
-                            Mode::FindNull
-                        },
-                        xs => {
-                            type_vec.push(xs);
-                            Mode::FindSpace
-                        }
-                    }
-                },
-                Mode::FindNull => {
-                    match header_byte[0] {
-                        0x0 => {
-                            header_handle = next_handle.into_inner();
-                            break
-                        },
-                        xs => {
-                            size_vec.push(xs);
-                            Mode::FindNull
-                        }
-                    }
-                }
-            };
-            mode = next;
-            header_handle = next_handle.into_inner();
-        }
-        let mut output_stream = header_handle;
-        let typename = std::str::from_utf8(&type_vec)?;
-
-        let loaded_type = match typename {
-            "commit" => Type::Commit,
-            "blob" => Type::Blob,
-            "tree" => Type::Tree,
-            "tag" => Type::Tag,
+        let loaded_type = match &type_vec[..] {
+            b"commit " => Type::Commit,
+            b"blob " => Type::Blob,
+            b"tree " => Type::Tree,
+            b"tag " => Type::Tag,
             &_ => return Err(ErrorKind::BadLooseObject.into())
         };
 
-        std::io::copy(&mut output_stream, output)?;
+        std::io::copy(&mut reader, output)?;
         Ok(Some(loaded_type))
     }
 }

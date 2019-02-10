@@ -81,14 +81,14 @@ impl<'a, S: Queryable> Iterator for CommitIterator<'a, S> {
         if let Some(xs) = newest.1.parents() {
             let seen = &mut self.seen;
             let storage_set = &self.storage_set;
-            let parents = xs.iter().filter_map(|id| {
-                if seen.contains(id) {
+            let parents = xs.into_iter().filter_map(|id| {
+                if seen.contains(&id) {
                     return None
                 }
 
-                if let Object::Commit(commit) = storage_set.get_and_load(id).ok()?? {
+                if let Object::Commit(commit) = storage_set.get_and_load(&id).ok()?? {
                     seen.insert(id.clone());
-                    return Some(IdCommit(id.clone(), commit))
+                    return Some(IdCommit(id, commit))
                 } else {
                     return None
                 }
