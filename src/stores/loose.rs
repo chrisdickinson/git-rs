@@ -7,7 +7,7 @@ use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::id::Id;
 
-type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>>;
+type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>> + Send + Sync;
 
 pub struct Store {
     read: Box<Reader>,
@@ -16,7 +16,7 @@ pub struct Store {
 
 impl Store {
     pub fn new<C>(func: C, filter: Option<[bool; 256]>) -> Self
-        where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static {
+        where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static + Send + Sync {
         let filter = match filter {
             Some(xs) => xs,
             None => [true; 256]

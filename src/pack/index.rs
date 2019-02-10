@@ -18,7 +18,7 @@ pub fn write<R, W, S>(
 ) -> Result<()> where
     R: BufRead + Seek + Clone + Debug + Sync,
     W: Write,
-    S: Queryable {
+    S: Queryable + Sync {
 
     let len = input.seek(SeekFrom::End(0))?;
     input.seek(SeekFrom::Start(0))?;
@@ -65,7 +65,7 @@ pub fn write<R, W, S>(
             offset,
             &mut input,
             &mut output,
-            Some(&StorageSet::new(()))
+            storage_set
         ).ok()?;
         let mut hash = Sha1::new();
         let header = format!("{} {}\0", object_type.as_str(), output.len());
