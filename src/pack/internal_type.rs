@@ -56,14 +56,13 @@ impl PackfileType {
                     return Err(ErrorKind::NeedStorageSet.into())
                 }
 
-                let (t, mut base_stream) = match backends.unwrap().get(&id)? {
-                    Some((xs, stream)) => (xs, stream),
+                let mut base_data = Vec::new();
+                let t = match backends.unwrap().get(&id, &mut base_data)? {
+                    Some(xs) => xs,
                     None => return Err(ErrorKind::CorruptedPackfile.into())
                 };
 
-                let mut base_buf = Vec::new();
-                base_stream.read_to_end(&mut base_buf)?;
-                let delta_decoder = DeltaDecoder::new(&instructions, base_buf)?;
+                let delta_decoder = DeltaDecoder::new(&instructions, base_data)?;
                 let mut stream: DeltaDecoderStream = delta_decoder.into();
                 std::io::copy(&mut stream, output)?;
                 t

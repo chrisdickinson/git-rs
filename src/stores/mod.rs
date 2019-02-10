@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io::Cursor;
 use std::io::Write;
 
 use crate::walk::commits::CommitIterator;
@@ -62,15 +63,8 @@ impl<Q: Queryable> StorageSet<Q> {
         }
     }
 
-    pub fn get(&self, id: &Id) -> Result<Option<(Type, Box<std::io::Read>)>> {
-        let mut output_stream = Vec::new();
-
-        match self.backend.get(id, &mut output_stream, &self)? {
-            Some(xs) => {
-                Ok(Some((xs, Box::new(std::io::Cursor::new(output_stream)))))
-            },
-            None => Ok(None)
-        }
+    pub fn get<W: Write>(&self, id: &Id, output: &mut W) -> Result<Option<Type>> {
+        self.backend.get(id, output, &self)
     }
 
     pub fn commits(&self, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<Q> {
@@ -104,8 +98,9 @@ impl<Q: Queryable> StorageSet<Q> {
     }
 
     pub fn get_and_load(&self, id: &Id) -> Result<Option<Object>> {
-        match self.get(id)? {
-            Some((typ, mut stream)) => Ok(Some(typ.load(&mut stream)?)),
+        let mut data = Vec::new();
+        match self.get(id, &mut data)? {
+            Some(typ) => Ok(Some(typ.load(&mut Cursor::new(&data))?)),
             None => Ok(None)
         }
     }
