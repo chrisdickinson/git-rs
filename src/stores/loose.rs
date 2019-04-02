@@ -55,7 +55,7 @@ impl Queryable for Store {
             FindSpace,
             FindNull,
         };
-        let mut mode = Mode::FindSpace;
+        let _mode = Mode::FindSpace;
 
         reader.read_until(0x20, &mut type_vec);
         reader.read_until(0, &mut size_vec);

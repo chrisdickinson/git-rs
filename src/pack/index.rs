@@ -171,11 +171,11 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     let mut version = [0u8; 4];
     input.read_exact(&mut version)?;
 
-    if (&magic != b"\xfftOc") {
+    if &magic != b"\xfftOc" {
         return Err(ErrorKind::InvalidPackfileIndex.into());
     }
 
-    if (version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) }) {
+    if version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) } {
         return Err(ErrorKind::UnsupportedPackfileIndexVersion.into());
     }
 

@@ -30,7 +30,7 @@ impl<R: Read + Seek + std::fmt::Debug> Packfile for Reader<R> {
     fn read_bounds<W: Write, S: Queryable>(
         &self,
         start: u64,
-        end: u64,
+        _end: u64,
         output: &mut W,
         backends: &StorageSet<S>,
     ) -> Result<Type> {
