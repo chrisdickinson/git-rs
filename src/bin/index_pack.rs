@@ -21,7 +21,7 @@ pub fn main() -> std::io::Result<()> {
     let cursor = Cursor::new(&mmap[..]);
 
     let storage_set = gitfs::from(current_dir.as_path()).expect("failed to open storage");
-    write(cursor, &mut io::stdout(), Some(&storage_set));
+    write(cursor, &mut io::stdout(), Some(&storage_set)).unwrap();
 
     Ok(())
 }

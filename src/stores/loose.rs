@@ -53,12 +53,12 @@ impl Queryable for Store {
         let mut size_vec = Vec::new();
         enum Mode {
             FindSpace,
-            FindNull,
+            //FindNull,
         };
         let _mode = Mode::FindSpace;
 
-        reader.read_until(0x20, &mut type_vec);
-        reader.read_until(0, &mut size_vec);
+        reader.read_until(0x20, &mut type_vec)?;
+        reader.read_until(0, &mut size_vec)?;
 
         let loaded_type = match &type_vec[..] {
             b"commit " => Type::Commit,

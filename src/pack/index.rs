@@ -4,7 +4,7 @@ use crypto::{digest::Digest, sha1::Sha1};
 use rayon::prelude::*;
 use std::fmt::Debug;
 use std::io::prelude::*;
-use std::io::{Cursor, SeekFrom};
+use std::io::SeekFrom;
 
 use crate::errors::{ErrorKind, Result};
 use crate::id::Id;
@@ -235,7 +235,7 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
         ids,
         offsets,
         next_offsets_indices,
-        crcs: crc_vec,
+        //crcs: crc_vec,
     })
 }
 
@@ -244,7 +244,7 @@ pub struct Index {
     ids: Vec<Id>,
     offsets: Vec<u64>,
     next_offsets_indices: Vec<usize>,
-    crcs: Vec<u32>,
+    //crcs: Vec<u32>,
 }
 
 impl Index {

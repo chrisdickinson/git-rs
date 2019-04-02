@@ -16,7 +16,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
     input.read_exact(&mut byte)?;
 
     let obj_type = (byte[0] & 0x70) >> 4;
-    let mut size = (byte[0] & 0xf) as u64;
+    let mut _size = (byte[0] & 0xf) as u64;
     let mut count = 0;
     let mut continuation = byte[0] & 0x80;
     loop {
@@ -27,7 +27,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
         input.read_exact(&mut byte)?;
         continuation = byte[0] & 0x80;
 
-        size |= ((byte[0] & 0x7f) as u64) << (4 + 7 * count);
+        _size |= ((byte[0] & 0x7f) as u64) << (4 + 7 * count);
         count += 1;
     }
 
