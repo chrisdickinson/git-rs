@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use crate::id::Id;
 
@@ -10,19 +10,19 @@ use crate::id::Id;
 pub enum Kind {
     Local,
     Remote,
-    Tag
+    Tag,
 }
 
 #[derive(Debug)]
 pub enum RefPtr {
     Indirect(String),
-    Direct(Id)
+    Direct(Id),
 }
 
 #[derive(Debug)]
 pub struct Ref {
     kind: Kind,
-    ptr: RefPtr
+    ptr: RefPtr,
 }
 
 pub struct RefSet(HashMap<String, Ref>);
@@ -41,7 +41,7 @@ impl Ref {
             if &contents[0..16] == "ref: refs/heads/" {
                 return Ok(Ref {
                     kind,
-                    ptr: RefPtr::Indirect(String::from(contents[16..].trim()))
+                    ptr: RefPtr::Indirect(String::from(contents[16..].trim())),
                 });
             }
 
@@ -49,7 +49,7 @@ impl Ref {
                 if let Ok(id) = Id::from_str(&contents[0..40]) {
                     return Ok(Ref {
                         ptr: RefPtr::Direct(id),
-                        kind
+                        kind,
                     });
                 }
             }
@@ -63,7 +63,7 @@ fn recurse_dir(
     root: &mut PathBuf,
     dirs: &mut Vec<String>,
     map: &mut HashMap<String, Ref>,
-    k: Kind
+    k: Kind,
 ) -> Result<(), std::io::Error> {
     for entry in std::fs::read_dir(root.as_path())? {
         let entry = entry?;
@@ -72,7 +72,7 @@ fn recurse_dir(
         let os_filename = entry.file_name();
         let opt_filename = os_filename.to_str();
         if opt_filename.is_none() {
-            continue
+            continue;
         }
         let filename = opt_filename.unwrap();
 
@@ -114,24 +114,20 @@ impl RefSet {
             map.insert(String::from("HEAD"), reference);
         };
 
-        Ok(RefSet {
-            0: map
-        })
+        Ok(RefSet { 0: map })
     }
 
     pub fn deref(&self, name: &str) -> Option<&Id> {
         let mut reference = self.0.get(name);
         loop {
             match reference {
-                Some(xs) => {
-                    match xs.ptr {
-                        RefPtr::Direct(ref id) => return Some(&id),
-                        RefPtr::Indirect(ref string) => {
-                            reference = self.0.get(string.as_str());
-                        }
+                Some(xs) => match xs.ptr {
+                    RefPtr::Direct(ref id) => return Some(&id),
+                    RefPtr::Indirect(ref string) => {
+                        reference = self.0.get(string.as_str());
                     }
                 },
-                None => return None
+                None => return None,
             }
         }
     }

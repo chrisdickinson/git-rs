@@ -1,54 +1,59 @@
 use flate2::bufread::ZlibDecoder;
 use std::io::prelude::*;
-use std::io::{ BufReader };
+use std::io::BufReader;
 
-use crate::stores::{ Queryable, StorageSet };
-use crate::errors::{ Result, ErrorKind };
-use crate::objects::Type;
+use crate::errors::{ErrorKind, Result};
 use crate::id::Id;
+use crate::objects::Type;
+use crate::stores::{Queryable, StorageSet};
 
 type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>> + Send + Sync;
 
 pub struct Store {
     read: Box<Reader>,
-    filter: [bool; 256]
+    filter: [bool; 256],
 }
 
 impl Store {
     pub fn new<C>(func: C, filter: Option<[bool; 256]>) -> Self
-        where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static + Send + Sync {
+    where
+        C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static + Send + Sync,
+    {
         let filter = match filter {
             Some(xs) => xs,
-            None => [true; 256]
+            None => [true; 256],
         };
 
         Store {
             read: Box::new(func),
-            filter
+            filter,
         }
     }
 }
 
 impl Queryable for Store {
-    fn get<W: Write, S: Queryable>(&self, id: &Id, output: &mut W, _: &StorageSet<S>) -> Result<Option<Type>> {
+    fn get<W: Write, S: Queryable>(
+        &self,
+        id: &Id,
+        output: &mut W,
+        _: &StorageSet<S>,
+    ) -> Result<Option<Type>> {
         if !self.filter[id.as_ref()[0] as usize] {
-            return Ok(None)
+            return Ok(None);
         }
 
         let maybe_reader = (self.read)(id)?;
         if maybe_reader.is_none() {
-            return Ok(None)
+            return Ok(None);
         }
 
-        let mut reader = BufReader::new(
-            ZlibDecoder::new(BufReader::new(maybe_reader.unwrap()))
-        );
+        let mut reader = BufReader::new(ZlibDecoder::new(BufReader::new(maybe_reader.unwrap())));
 
         let mut type_vec = Vec::new();
         let mut size_vec = Vec::new();
         enum Mode {
             FindSpace,
-            FindNull
+            FindNull,
         };
         let mut mode = Mode::FindSpace;
 
@@ -60,7 +65,7 @@ impl Queryable for Store {
             b"blob " => Type::Blob,
             b"tree " => Type::Tree,
             b"tag " => Type::Tag,
-            &_ => return Err(ErrorKind::BadLooseObject.into())
+            &_ => return Err(ErrorKind::BadLooseObject.into()),
         };
 
         std::io::copy(&mut reader, output)?;
@@ -70,20 +75,29 @@ impl Queryable for Store {
 
 #[cfg(test)]
 mod tests {
-    use crate::stores::{ Queryable, StorageSet };
-    use crate::objects::Object;
     use crate::id::Id;
+    use crate::objects::Object;
+    use crate::stores::{Queryable, StorageSet};
 
+    use super::{ErrorKind, Store};
     use std::io::Cursor;
-    use super::{ Store, ErrorKind };
 
     #[test]
     fn read_commit_works() {
-        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_commit") as &[u8]))), None);
+        let store = Store::new(
+            |_| {
+                Ok(Some(Box::new(
+                    include_bytes!("../../fixtures/loose_commit") as &[u8],
+                )))
+            },
+            None,
+        );
         let storage_set = StorageSet::new(());
 
         let mut stream = Vec::new();
-        let option = store.get(&Id::default(), &mut stream, &storage_set).expect("it exploded");
+        let option = store
+            .get(&Id::default(), &mut stream, &storage_set)
+            .expect("it exploded");
         if let Some(xs) = option {
             let mut readable = Cursor::new(stream);
             let object = xs.load(&mut readable).expect("failed to load");
@@ -101,21 +115,35 @@ mod tests {
 
     #[test]
     fn read_tree_works() {
-        let store = Store::new(|_| Ok(Some(Box::new(include_bytes!("../../fixtures/loose_tree") as &[u8]))), None);
+        let store = Store::new(
+            |_| {
+                Ok(Some(Box::new(
+                    include_bytes!("../../fixtures/loose_tree") as &[u8]
+                )))
+            },
+            None,
+        );
         let storage_set = StorageSet::new(());
 
         let mut stream = Vec::new();
-        let option = store.get(&Id::default(), &mut stream, &storage_set).expect("it exploded");
+        let option = store
+            .get(&Id::default(), &mut stream, &storage_set)
+            .expect("it exploded");
         if let Some(xs) = option {
             let mut readable = Cursor::new(stream);
             let object = xs.load(&mut readable).expect("failed to load");
 
             if let Object::Tree(tree) = object {
-                let mut entries: Vec<&str> = tree.entries().keys()
+                let mut entries: Vec<&str> = tree
+                    .entries()
+                    .keys()
                     .map(|xs| ::std::str::from_utf8(xs).expect("valid utf8"))
                     .collect();
                 entries.sort();
-                assert_eq!(entries.join("\n"), ".gitignore\nCargo.toml\nREADME.md\nfixtures\nsrc");
+                assert_eq!(
+                    entries.join("\n"),
+                    ".gitignore\nCargo.toml\nREADME.md\nfixtures\nsrc"
+                );
             } else {
                 panic!("expected tree");
             }
@@ -131,7 +159,7 @@ mod tests {
 
         match store.get(&Id::default(), &mut vec![], &storage_set) {
             Ok(_) => panic!("expected failure!"),
-            Err(e) => assert_eq!(e.description(), "BadLooseObject")
+            Err(e) => assert_eq!(e.description(), "BadLooseObject"),
         };
     }
 
@@ -142,7 +170,7 @@ mod tests {
 
         match store.get(&Id::default(), &mut vec![], &storage_set) {
             Err(_) => panic!("expected success!"),
-            Ok(xs) => assert!(xs.is_none())
+            Ok(xs) => assert!(xs.is_none()),
         };
     }
 }

@@ -1,50 +1,60 @@
-use crc::crc32::{ self, Digest as CRCDigest, Hasher32 };
-use crypto::{ sha1::Sha1, digest::Digest };
-use byteorder::{ BigEndian, ReadBytesExt };
-use std::io::{ Cursor, SeekFrom };
-use std::io::prelude::*;
+use byteorder::{BigEndian, ReadBytesExt};
+use crc::crc32::{self, Digest as CRCDigest, Hasher32};
+use crypto::{digest::Digest, sha1::Sha1};
 use rayon::prelude::*;
 use std::fmt::Debug;
+use std::io::prelude::*;
+use std::io::{Cursor, SeekFrom};
 
-use crate::stores::{ StorageSet, Queryable };
-use crate::errors::{ ErrorKind, Result };
-use crate::pack::iter::PackfileIterator;
+use crate::errors::{ErrorKind, Result};
 use crate::id::Id;
+use crate::pack::iter::PackfileIterator;
+use crate::stores::{Queryable, StorageSet};
 
 pub fn write<R, W, S>(
     mut input: R,
     output: &mut W,
-    storage_set: Option<&StorageSet<S>>
-) -> Result<()> where
+    storage_set: Option<&StorageSet<S>>,
+) -> Result<()>
+where
     R: BufRead + Seek + Clone + Debug + Sync,
     W: Write,
-    S: Queryable + Sync {
-
+    S: Queryable + Sync,
+{
     let len = input.seek(SeekFrom::End(0))?;
     input.seek(SeekFrom::Start(0))?;
 
-    let iter = PackfileIterator::new(input.clone(), storage_set).expect("failed to parse as packfile");
+    let iter =
+        PackfileIterator::new(input.clone(), storage_set).expect("failed to parse as packfile");
     let mut offsets = Vec::with_capacity(4096);
 
     // first pass: find all offsets and non-delta'd ids
-    let objects: Vec<_> = iter.map(|(offset, pf_type, id)| {
-        offsets.push(offset.clone());
-        (offset, pf_type, id)
-    }).collect();
+    let objects: Vec<_> = iter
+        .map(|(offset, pf_type, id)| {
+            offsets.push(offset.clone());
+            (offset, pf_type, id)
+        })
+        .collect();
     offsets.push(len - 20);
 
     // second pass: calculate crcs between offsets
     let windows: Vec<_> = offsets.windows(2).collect();
-    let crcs: Vec<_> = windows.par_iter().filter_map(|offset| {
-        let mut digest = CRCDigest::new(crc32::IEEE);
+    let crcs: Vec<_> = windows
+        .par_iter()
+        .filter_map(|offset| {
+            let mut digest = CRCDigest::new(crc32::IEEE);
 
-        let mut cursor = input.clone();
-        cursor.seek(SeekFrom::Start(offset[0])).ok()?;
-        let mut input_bytes = Vec::with_capacity((offset[1] - offset[0]) as usize);
-        cursor.take(offset[1] - offset[0]).read_to_end(&mut input_bytes).ok()?;
-        digest.write(&input_bytes);
-        Some(digest.sum32())
-    }).collect();
+            let mut cursor = input.clone();
+            cursor.seek(SeekFrom::Start(offset[0])).ok()?;
+            let mut input_bytes = Vec::with_capacity((offset[1] - offset[0]) as usize);
+            cursor
+                .take(offset[1] - offset[0])
+                .read_to_end(&mut input_bytes)
+                .ok()?;
+            digest.write(&input_bytes);
+            Some(digest.sum32())
+        })
+        .collect();
 
     if crcs.len() != objects.len() {
         return Err(ErrorKind::CorruptedPackfile.into());
@@ -52,34 +62,30 @@ pub fn write<R, W, S>(
 
     // third pass: calculate delta reprs
     let mut decompressed: Vec<_> = objects
-                        .into_par_iter()
-                        .enumerate()
-                        .filter_map(|(idx, (offset, pf_type, id))| {
-        if id.is_some() {
-            return Some((idx, offset, id.unwrap()))
-        }
+        .into_par_iter()
+        .enumerate()
+        .filter_map(|(idx, (offset, pf_type, id))| {
+            if id.is_some() {
+                return Some((idx, offset, id.unwrap()));
+            }
 
-        let mut input = input.clone();
-        let mut output = Vec::new();
-        let object_type = pf_type.decompress(
-            offset,
-            &mut input,
-            &mut output,
-            storage_set
-        ).ok()?;
-        let mut hash = Sha1::new();
-        let header = format!("{} {}\0", object_type.as_str(), output.len());
-        hash.input(header.as_bytes());
-        hash.input(&output[..]);
-        let mut id_output = [0u8; 20];
-        hash.result(&mut id_output);
-        Some((idx, offset, Id::from(&id_output[..])))
-    }).collect();
+            let mut input = input.clone();
+            let mut output = Vec::new();
+            let object_type = pf_type
+                .decompress(offset, &mut input, &mut output, storage_set)
+                .ok()?;
+            let mut hash = Sha1::new();
+            let header = format!("{} {}\0", object_type.as_str(), output.len());
+            hash.input(header.as_bytes());
+            hash.input(&output[..]);
+            let mut id_output = [0u8; 20];
+            hash.result(&mut id_output);
+            Some((idx, offset, Id::from(&id_output[..])))
+        })
+        .collect();
 
     // sort the results by id hash (instead of offset order)
-    decompressed.par_sort_unstable_by(|lhs, rhs| {
-        lhs.2.cmp(&rhs.2)
-    });
+    decompressed.par_sort_unstable_by(|lhs, rhs| lhs.2.cmp(&rhs.2));
 
     let mut fanout = [0u32; 256]; // each value in fanout holds the upper bound index of the object starting with the incoming byte
     let mut byte = 0u8;
@@ -166,11 +172,11 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     input.read_exact(&mut version)?;
 
     if (&magic != b"\xfftOc") {
-        return Err(ErrorKind::InvalidPackfileIndex.into())
+        return Err(ErrorKind::InvalidPackfileIndex.into());
     }
 
     if (version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) }) {
-        return Err(ErrorKind::UnsupportedPackfileIndexVersion.into())
+        return Err(ErrorKind::UnsupportedPackfileIndexVersion.into());
     }
 
     let mut fanout = [0u32; 256];
@@ -178,17 +184,18 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
 
     let object_count = fanout[255] as usize;
 
-    let mut oid_bytes_vec = vec!(0u8; object_count * 20);
+    let mut oid_bytes_vec = vec![0u8; object_count * 20];
     input.read_exact(&mut oid_bytes_vec.as_mut_slice())?;
 
-    let ids: Vec<Id> = oid_bytes_vec.chunks(20).map(
-        |chunk| Id::from(chunk)
-    ).collect();
+    let ids: Vec<Id> = oid_bytes_vec
+        .chunks(20)
+        .map(|chunk| Id::from(chunk))
+        .collect();
 
-    let mut crc_vec = vec!(0u32; object_count);
+    let mut crc_vec = vec![0u32; object_count];
     input.read_u32_into::<BigEndian>(&mut crc_vec.as_mut_slice())?;
 
-    let mut offsets_vec = vec!(0u32; object_count);
+    let mut offsets_vec = vec![0u32; object_count];
     input.read_u32_into::<BigEndian>(&mut offsets_vec.as_mut_slice())?;
 
     let mut large_offset_count = 0;
@@ -199,16 +206,19 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
         }
     }
 
-    let mut large_offsets_vec = vec!(0u64; large_offset_count as usize);
+    let mut large_offsets_vec = vec![0u64; large_offset_count as usize];
     input.read_u64_into::<BigEndian>(&mut large_offsets_vec)?;
 
-    let offsets: Vec<_> = offsets_vec.into_iter().map(|offset| {
-        if offset & 0x8000_0000 != 0 {
-            large_offsets_vec[(offset & 0x7FFF_FFFF) as usize]
-        } else {
-            offset as u64
-        }
-    }).collect();
+    let offsets: Vec<_> = offsets_vec
+        .into_iter()
+        .map(|offset| {
+            if offset & 0x8000_0000 != 0 {
+                large_offsets_vec[(offset & 0x7FFF_FFFF) as usize]
+            } else {
+                offset as u64
+            }
+        })
+        .collect();
 
     let mut offset_idx_sorted: Vec<(usize, &u64)> = offsets.iter().enumerate().collect();
     offset_idx_sorted.sort_by_key(|(_, offset)| *offset);
@@ -225,7 +235,7 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
         ids,
         offsets,
         next_offsets_indices,
-        crcs: crc_vec
+        crcs: crc_vec,
     })
 }
 
@@ -238,7 +248,7 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn get_bounds (&self, id: &Id) -> Option<(u64, u64)> {
+    pub fn get_bounds(&self, id: &Id) -> Option<(u64, u64)> {
         let as_bytes: &[u8] = id.as_ref();
         let mut lo = if as_bytes[0] > 0 {
             self.fanout[(as_bytes[0] - 1) as usize]
@@ -251,29 +261,29 @@ impl Index {
         loop {
             middle = ((lo + hi) >> 1) as usize;
             if middle >= len {
-                return None
+                return None;
             }
 
             match id.partial_cmp(&self.ids[middle]) {
                 Some(xs) => match xs {
                     std::cmp::Ordering::Less => {
                         hi = middle as u32;
-                    },
+                    }
                     std::cmp::Ordering::Greater => {
                         lo = (middle + 1) as u32;
-                    },
+                    }
                     std::cmp::Ordering::Equal => {
                         return Some((
                             self.offsets[middle],
-                            self.offsets[self.next_offsets_indices[middle]]
+                            self.offsets[self.next_offsets_indices[middle]],
                         ));
                     }
                 },
-                None => return None
+                None => return None,
             }
 
             if lo >= hi {
-                break
+                break;
             }
         }
 

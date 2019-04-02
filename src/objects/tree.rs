@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
 use crate::errors::Result;
 use crate::id::Id;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct FileMode(u32);
@@ -8,16 +8,16 @@ pub struct FileMode(u32);
 #[derive(Debug)]
 pub struct TreeEntry {
     pub mode: FileMode,
-    pub id: Id
+    pub id: Id,
 }
 
 #[derive(Debug)]
 pub struct Tree {
-    entries: BTreeMap<Vec<u8>, TreeEntry>
+    entries: BTreeMap<Vec<u8>, TreeEntry>,
 }
 
 impl Tree {
-    pub fn entries (&self) -> &BTreeMap<Vec<u8>, TreeEntry> {
+    pub fn entries(&self) -> &BTreeMap<Vec<u8>, TreeEntry> {
         &self.entries
     }
 }
@@ -37,11 +37,11 @@ impl Tree {
         handle.read_to_end(&mut vec)?;
         let buf = &vec;
 
-        #[derive(Debug)] 
+        #[derive(Debug)]
         enum Mode {
             FindSpace,
             FindNull,
-            CollectHash
+            CollectHash,
         }
         let mut entries = BTreeMap::new();
         let mut anchor = 0;
@@ -58,7 +58,7 @@ impl Tree {
                     } else {
                         Mode::FindSpace
                     }
-                },
+                }
                 Mode::FindNull => {
                     if *byte == 0 {
                         null = idx;
@@ -66,7 +66,7 @@ impl Tree {
                     } else {
                         Mode::FindNull
                     }
-                },
+                }
                 Mode::CollectHash => {
                     if idx - null < 20 {
                         Mode::CollectHash
@@ -75,10 +75,13 @@ impl Tree {
                         let mode_str = std::str::from_utf8(&buf[anchor..space])?;
                         let mode = u32::from_str_radix(mode_str, 8)?;
 
-                        entries.insert(name, TreeEntry {
-                            mode: FileMode(mode),
-                            id: Id::from(&buf[null + 1..=idx])
-                        });
+                        entries.insert(
+                            name,
+                            TreeEntry {
+                                mode: FileMode(mode),
+                                id: Id::from(&buf[null + 1..=idx]),
+                            },
+                        );
 
                         anchor = idx + 1;
                         Mode::FindSpace
@@ -88,24 +91,25 @@ impl Tree {
             mode = next
         }
 
-        Ok(Tree {
-            entries
-        })
+        Ok(Tree { entries })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::id::Id;
-    use std::str::FromStr;
     use crate::objects::tree::FileMode;
+    use std::str::FromStr;
 
     #[test]
     fn tree_read_works() {
         let bytes = include_bytes!("../../fixtures/tree");
         let tree = super::Tree::load(&mut bytes.as_ref()).expect("oh no");
         let tree_entry = tree.entries.get("src".as_bytes()).unwrap();
-        assert_eq!(tree_entry.id, Id::from_str("dc222eddb8d03b5f7cac5e7909dd400f3ce33935").unwrap());
+        assert_eq!(
+            tree_entry.id,
+            Id::from_str("dc222eddb8d03b5f7cac5e7909dd400f3ce33935").unwrap()
+        );
         assert_eq!(tree_entry.mode, FileMode(0o40000));
     }
 
@@ -113,17 +117,26 @@ mod tests {
     fn tree_complex_read_works() {
         let bytes = include_bytes!("../../fixtures/tree_1");
         let tree = super::Tree::load(&mut bytes.as_ref()).expect("oh no");
-        let mut entries: Vec<&str> = tree.entries.keys()
+        let mut entries: Vec<&str> = tree
+            .entries
+            .keys()
             .map(|xs| ::std::str::from_utf8(xs).expect("valid utf8"))
             .collect();
         entries.sort();
 
         assert_eq!(entries.join("\n"), "errors.rs\nid.rs\nlib.rs\nobjects");
-        let tree_entries = entries.iter().map(|xs| tree.entries.get(xs.as_bytes()).unwrap());
+        let tree_entries = entries
+            .iter()
+            .map(|xs| tree.entries.get(xs.as_bytes()).unwrap());
         let modes: Vec<FileMode> = tree_entries.clone().map(|xs| xs.mode.clone()).collect();
         assert_eq!(
             modes,
-            vec![FileMode(0o100644), FileMode(0o100644), FileMode(0o100644), FileMode(0o40000)]
+            vec![
+                FileMode(0o100644),
+                FileMode(0o100644),
+                FileMode(0o100644),
+                FileMode(0o40000)
+            ]
         );
         let ids: Vec<Id> = tree_entries.map(|xs| xs.id.clone()).collect();
         assert_eq!(

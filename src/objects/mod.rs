@@ -1,24 +1,24 @@
-use crate::pack::internal_type::PackfileType;
 use crate::errors::Result;
+use crate::pack::internal_type::PackfileType;
 
-pub mod commit;
 pub mod blob;
-pub mod tree;
+pub mod commit;
 pub mod tag;
+pub mod tree;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Type {
     Commit,
     Tree,
     Blob,
-    Tag
+    Tag,
 }
 
 pub enum Object {
     Commit(commit::Commit),
     Tree(tree::Tree),
     Blob(blob::Blob),
-    Tag(tag::Tag)
+    Tag(tag::Tag),
 }
 
 impl std::convert::Into<PackfileType> for Type {
@@ -27,7 +27,7 @@ impl std::convert::Into<PackfileType> for Type {
             Type::Commit => 1,
             Type::Tree => 2,
             Type::Blob => 3,
-            Type::Tag => 4
+            Type::Tag => 4,
         })
     }
 }
@@ -35,20 +35,14 @@ impl std::convert::Into<PackfileType> for Type {
 impl std::convert::From<PackfileType> for Type {
     fn from(t: PackfileType) -> Type {
         match t {
-            PackfileType::Plain(ident) => {
-                match ident {
-                    1 => Type::Commit,
-                    2 => Type::Tree,
-                    3 => Type::Blob,
-                    4 => Type::Tag,
-                    _ => {
-                        panic!("Unknown packfile type")
-                    }
-                }
+            PackfileType::Plain(ident) => match ident {
+                1 => Type::Commit,
+                2 => Type::Tree,
+                3 => Type::Blob,
+                4 => Type::Tag,
+                _ => panic!("Unknown packfile type"),
             },
-            _ => {
-                panic!("Cannot convert delta packfile type to external type")
-            }
+            _ => panic!("Cannot convert delta packfile type to external type"),
         }
     }
 }
@@ -59,7 +53,7 @@ impl Type {
             Type::Commit => "commit",
             Type::Tree => "tree",
             Type::Blob => "blob",
-            Type::Tag => "tag"
+            Type::Tag => "tag",
         }
     }
 
@@ -68,15 +62,15 @@ impl Type {
             Type::Commit => {
                 let xs = commit::Commit::load(stream)?;
                 Ok(Object::Commit(xs))
-            },
+            }
             Type::Tree => {
                 let xs = tree::Tree::load(stream)?;
                 Ok(Object::Tree(xs))
-            },
+            }
             Type::Tag => {
                 let xs = tag::Tag::load(stream)?;
                 Ok(Object::Tag(xs))
-            },
+            }
             Type::Blob => {
                 let xs = blob::Blob::load(stream)?;
                 Ok(Object::Blob(xs))

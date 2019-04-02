@@ -1,20 +1,19 @@
-use crate::stores::loose::{ Store as LooseStore };
-use crate::pack::index::{ read as read_packidx };
+use crate::pack::index::read as read_packidx;
 use crate::pack::mmap::Reader as MmapPackReader;
-use crate::stores::pack::{ Store as PackStore };
+use crate::stores::loose::Store as LooseStore;
+use crate::stores::pack::Store as PackStore;
 use crate::stores::StorageSet;
 use memmap::MmapOptions;
 
 use std::path::Path;
 
-pub fn from(path: &Path) -> Result<StorageSet<(Vec<PackStore<MmapPackReader>>, LooseStore)>, std::io::Error> {
+pub fn from(
+    path: &Path,
+) -> Result<StorageSet<(Vec<PackStore<MmapPackReader>>, LooseStore)>, std::io::Error> {
     let packfiles = packfiles_from_path(path)?;
     let loose = loose_from_path(path)?;
 
-    Ok(StorageSet::new((
-        packfiles,
-        loose
-    )))
+    Ok(StorageSet::new((packfiles, loose)))
 }
 
 pub fn loose_from_path(path: &Path) -> Result<LooseStore, std::io::Error> {
@@ -28,31 +27,32 @@ pub fn loose_from_path(path: &Path) -> Result<LooseStore, std::io::Error> {
         let entry = entry?;
         let os_filename = entry.file_name();
         if os_filename.len() != 2 {
-            continue
+            continue;
         }
 
         let result = match usize::from_str_radix(&os_filename.to_string_lossy(), 16) {
             Ok(xs) => xs,
-            Err(_) => continue
+            Err(_) => continue,
         };
         filter[result] = true;
     }
 
-    let loose_store = LooseStore::new(move |id| {
-        let as_str = id.to_string();
-        let mut pb = root.clone();
-        pb.push(as_str[0..2].to_string());
-        pb.push(as_str[2..40].to_string());
-        match std::fs::File::open(pb.as_path()) {
-            Ok(f) => Ok(Some(Box::new(f))),
-            Err(e) => {
-                match e.kind() {
+    let loose_store = LooseStore::new(
+        move |id| {
+            let as_str = id.to_string();
+            let mut pb = root.clone();
+            pb.push(as_str[0..2].to_string());
+            pb.push(as_str[2..40].to_string());
+            match std::fs::File::open(pb.as_path()) {
+                Ok(f) => Ok(Some(Box::new(f))),
+                Err(e) => match e.kind() {
                     std::io::ErrorKind::NotFound => Ok(None),
-                    _ => Err(e)?
-                }
+                    _ => Err(e)?,
+                },
             }
-        }
-    }, Some(filter));
+        },
+        Some(filter),
+    );
 
     Ok(loose_store)
 }
@@ -70,11 +70,11 @@ pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>
         let os_filename = entry.file_name();
         let filename = os_filename.to_str();
         if filename.is_none() {
-            continue
+            continue;
         }
 
         if !filename.unwrap().ends_with(".idx") {
-            continue
+            continue;
         }
 
         let entry_path = entry.path();
@@ -83,7 +83,7 @@ pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>
         let index_mmap = unsafe { MmapOptions::new().map(&index_file)? };
         let idx = match read_packidx(std::io::Cursor::new(index_mmap)) {
             Ok(xs) => xs,
-            Err(_) => return Err(std::io::ErrorKind::InvalidData.into())
+            Err(_) => return Err(std::io::ErrorKind::InvalidData.into()),
         };
 
         let mut epb = entry_path.to_path_buf();

@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
-use crate::identity::Identity;
 use crate::errors::Result;
 use crate::id::Id;
+use crate::identity::Identity;
 
 #[derive(Debug)]
 pub struct Commit {
     attributes: HashMap<Vec<u8>, Vec<Vec<u8>>>,
     committer: Option<Identity>,
     author: Option<Identity>,
-    message: Vec<u8>
+    message: Vec<u8>,
 }
 
 impl Commit {
@@ -28,17 +28,27 @@ impl Commit {
     pub fn tree(&self) -> Option<Id> {
         let v = self.attributes.get(b"tree" as &[u8])?;
 
-        let mut result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(&id_bytes).ok().and_then(|xs| xs.parse().ok())
-        }).collect();
+        let mut result: Vec<Id> = v
+            .iter()
+            .filter_map(|id_bytes| {
+                std::str::from_utf8(&id_bytes)
+                    .ok()
+                    .and_then(|xs| xs.parse().ok())
+            })
+            .collect();
         result.pop()
     }
 
     pub fn parents(&self) -> Option<Vec<Id>> {
         let v = self.attributes.get(b"parent" as &[u8])?;
-        let result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(&id_bytes).ok().and_then(|xs| xs.parse().ok())
-        }).collect();
+        let result: Vec<Id> = v
+            .iter()
+            .filter_map(|id_bytes| {
+                std::str::from_utf8(&id_bytes)
+                    .ok()
+                    .and_then(|xs| xs.parse().ok())
+            })
+            .collect();
         Some(result)
     }
 }
@@ -55,7 +65,7 @@ impl Commit {
         #[derive(Debug)]
         enum Mode {
             Attr,
-            Value
+            Value,
         };
         let mut anchor = 0;
         let mut space = 0;
@@ -65,39 +75,32 @@ impl Commit {
         let mut attributes = HashMap::new();
         for (idx, byte) in buf.iter().enumerate() {
             let next = match mode {
-                Mode::Attr => {
-                    match *byte {
-                        0x20 => {
-                            space = idx;
-                            Mode::Value
-                        },
-                        0x0a => {
-                            if anchor == idx {
-                                message_idx = idx + 1;
-                                break
-                            }
-                            Mode::Attr
-                        },
-                        _ => Mode::Attr
+                Mode::Attr => match *byte {
+                    0x20 => {
+                        space = idx;
+                        Mode::Value
                     }
+                    0x0a => {
+                        if anchor == idx {
+                            message_idx = idx + 1;
+                            break;
+                        }
+                        Mode::Attr
+                    }
+                    _ => Mode::Attr,
                 },
 
-                Mode::Value => {
-                    match *byte {
-                        0x0a => {
-                            let key = buf[anchor..space].to_vec();
-                            let value = buf[space + 1..idx].to_vec();
-                            attributes
-                                .entry(key)
-                                .or_insert_with(Vec::new)
-                                .push(value);
-                            anchor = idx + 1;
-                            space = idx;
-                            Mode::Attr
-                        },
-                        _ => Mode::Value
+                Mode::Value => match *byte {
+                    0x0a => {
+                        let key = buf[anchor..space].to_vec();
+                        let value = buf[space + 1..idx].to_vec();
+                        attributes.entry(key).or_insert_with(Vec::new).push(value);
+                        anchor = idx + 1;
+                        space = idx;
+                        Mode::Attr
                     }
-                }
+                    _ => Mode::Value,
+                },
             };
 
             mode = next;
@@ -125,7 +128,7 @@ impl Commit {
             attributes,
             committer,
             message,
-            author
+            author,
         })
     }
 }

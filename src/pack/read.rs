@@ -1,16 +1,16 @@
 use flate2::bufread::ZlibDecoder;
-use std::io::prelude::*;
 use std;
+use std::io::prelude::*;
 
-use crate::pack::internal_type::PackfileType;
-use crate::delta::{ OFS_DELTA, REF_DELTA };
-use crate::errors::{ Result, ErrorKind };
+use crate::delta::{OFS_DELTA, REF_DELTA};
+use crate::errors::{ErrorKind, Result};
 use crate::id::Id;
+use crate::pack::internal_type::PackfileType;
 
 pub fn packfile_read<R: BufRead, W: Write>(
     input: &mut R,
     output: &mut W,
-    read_bytes: &mut u64
+    read_bytes: &mut u64,
 ) -> Result<PackfileType> {
     let mut byte = [0u8; 1];
     input.read_exact(&mut byte)?;
@@ -21,7 +21,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
     let mut continuation = byte[0] & 0x80;
     loop {
         if continuation < 1 {
-            break
+            break;
         }
 
         input.read_exact(&mut byte)?;
@@ -37,7 +37,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
             std::io::copy(&mut deflate_stream, output)?;
             *read_bytes = 1 + count + deflate_stream.total_in();
             return Ok(PackfileType::Plain(obj_type));
-        },
+        }
 
         OFS_DELTA => {
             input.read_exact(&mut byte)?;
@@ -56,8 +56,8 @@ pub fn packfile_read<R: BufRead, W: Write>(
             deflate_stream.read_to_end(&mut instructions)?;
 
             *read_bytes = 2 + count + deflate_stream.total_in();
-            return Ok(PackfileType::OffsetDelta((offset, instructions)))
-        },
+            return Ok(PackfileType::OffsetDelta((offset, instructions)));
+        }
 
         REF_DELTA => {
             let mut ref_bytes = [0u8; 20];
@@ -68,11 +68,9 @@ pub fn packfile_read<R: BufRead, W: Write>(
             let mut instructions = Vec::new();
             deflate_stream.read_to_end(&mut instructions)?;
             *read_bytes = 21 + count + deflate_stream.total_in();
-            return Ok(PackfileType::RefDelta((id, instructions)))
-        },
-
-        _ => {
-            Err(ErrorKind::BadLooseObject.into())
+            return Ok(PackfileType::RefDelta((id, instructions)));
         }
+
+        _ => Err(ErrorKind::BadLooseObject.into()),
     }
 }

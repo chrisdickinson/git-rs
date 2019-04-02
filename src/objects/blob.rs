@@ -1,7 +1,7 @@
 use crate::errors::Result;
 
 pub struct Blob {
-    pub contents: Vec<u8>
+    pub contents: Vec<u8>,
 }
 
 impl Blob {
@@ -9,8 +9,6 @@ impl Blob {
         let mut contents = Vec::new();
         handle.read_to_end(&mut contents)?;
 
-        Ok(Blob {
-            contents
-        })
+        Ok(Blob { contents })
     }
 }

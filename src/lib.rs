@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate error_chain;
 
-pub mod id;
 pub mod delta;
 pub mod errors;
-pub mod stores;
+pub mod id;
+pub mod identity;
 pub mod objects;
 pub mod pack;
 pub mod refs;
+pub mod stores;
 pub mod walk;
-pub mod identity;
 
 #[cfg(test)]
 mod tests {

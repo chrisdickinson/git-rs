@@ -1,6 +1,6 @@
 use std;
 
-use crate::errors::{ ErrorKind, Result };
+use crate::errors::{ErrorKind, Result};
 use std::io::Write;
 
 pub const OFS_DELTA: u8 = 6;
@@ -9,12 +9,12 @@ pub const REF_DELTA: u8 = 7;
 #[derive(Debug)]
 struct CopyState {
     offset: usize,
-    extent: usize
+    extent: usize,
 }
 
 #[derive(Debug)]
 struct InsertState {
-    extent: usize
+    extent: usize,
 }
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ enum DeltaDecoderState {
     NextCommand,
     Copy(CopyState),
     Insert(InsertState),
-    Done
+    Done,
 }
 
 #[derive(Debug)]
@@ -32,33 +32,33 @@ pub struct DeltaDecoderStream {
     inner: Vec<u8>,
     index: usize,
     output_size: usize,
-    written: usize
+    written: usize,
 }
 
 #[derive(Debug)]
 pub struct DeltaDecoder {
     instructions: Vec<u8>,
     inner: Vec<u8>,
-    output_size: usize
+    output_size: usize,
 }
 
 impl DeltaDecoder {
-    pub fn new (instructions: &[u8], base: Vec<u8>) -> Result<DeltaDecoder> {
+    pub fn new(instructions: &[u8], base: Vec<u8>) -> Result<DeltaDecoder> {
         let (after_base_size, base_size) = read_varint(0, instructions);
         let (index, output_size) = read_varint(after_base_size, instructions);
 
         if base.len() != base_size {
-            return Err(ErrorKind::BadDeltaBase.into())
+            return Err(ErrorKind::BadDeltaBase.into());
         }
 
         Ok(DeltaDecoder {
             instructions: Vec::from(&instructions[index..]),
             output_size,
-            inner: base
+            inner: base,
         })
     }
 
-    pub fn output_size (&self) -> usize {
+    pub fn output_size(&self) -> usize {
         self.output_size
     }
 }
@@ -71,7 +71,7 @@ impl std::convert::Into<DeltaDecoderStream> for DeltaDecoder {
             written: 0,
             state: DeltaDecoderState::NextCommand,
             inner: self.inner,
-            output_size: self.output_size
+            output_size: self.output_size,
         }
     }
 }
@@ -99,10 +99,10 @@ impl std::io::Read for DeltaDecoderStream {
             let (next_state, exhausted) = match &self.state {
                 DeltaDecoderState::Done => {
                     if self.written != self.output_size {
-                        return Err(std::io::ErrorKind::WriteZero.into())
+                        return Err(std::io::ErrorKind::WriteZero.into());
                     }
-                    return Ok(written)
-                },
+                    return Ok(written);
+                }
 
                 DeltaDecoderState::NextCommand => {
                     if self.index >= self.instructions.len() {
@@ -137,22 +137,20 @@ impl std::io::Read for DeltaDecoderStream {
 
                             extent &= 0x00FF_FFFF;
                             extent = if extent == 0 { 0x10000 } else { extent };
-                            DeltaDecoderState::Copy(CopyState {
-                                offset,
-                                extent
-                            })
+                            DeltaDecoderState::Copy(CopyState { offset, extent })
                         } else {
                             DeltaDecoderState::Insert(InsertState {
-                                extent: cmd as usize
+                                extent: cmd as usize,
                             })
                         };
 
                         (next, false)
                     }
-                },
+                }
 
                 DeltaDecoderState::Copy(state) => {
-                    let wrote = buf.write(&self.inner[state.offset .. state.offset + state.extent])?;
+                    let wrote =
+                        buf.write(&self.inner[state.offset..state.offset + state.extent])?;
 
                     let extent = state.extent - wrote;
                     let offset = state.offset + wrote;
@@ -160,15 +158,13 @@ impl std::io::Read for DeltaDecoderStream {
                     if extent == 0 {
                         (DeltaDecoderState::NextCommand, false)
                     } else {
-                        (DeltaDecoderState::Copy(CopyState {
-                            extent,
-                            offset
-                        }), true)
+                        (DeltaDecoderState::Copy(CopyState { extent, offset }), true)
                     }
-                },
+                }
 
                 DeltaDecoderState::Insert(state) => {
-                    let wrote = buf.write(&self.instructions[self.index .. self.index + state.extent])?;
+                    let wrote =
+                        buf.write(&self.instructions[self.index..self.index + state.extent])?;
                     self.index += wrote;
                     let extent = state.extent - wrote;
                     written += wrote;
@@ -176,16 +172,14 @@ impl std::io::Read for DeltaDecoderStream {
                     if extent == 0 {
                         (DeltaDecoderState::NextCommand, false)
                     } else {
-                        (DeltaDecoderState::Insert(InsertState {
-                            extent
-                        }), true)
+                        (DeltaDecoderState::Insert(InsertState { extent }), true)
                     }
                 }
             };
 
             self.state = next_state;
             if exhausted {
-                break
+                break;
             }
         }
 
@@ -196,7 +190,7 @@ impl std::io::Read for DeltaDecoderStream {
 
 #[cfg(test)]
 mod tests {
-    use super::{ DeltaDecoder, DeltaDecoderStream };
+    use super::{DeltaDecoder, DeltaDecoderStream};
     use std::io::Read;
 
     use crate::objects::commit::Commit;
@@ -206,7 +200,8 @@ mod tests {
         let base = include_bytes!("../fixtures/delta_base");
         let instructions = include_bytes!("../fixtures/delta_instructions");
         let expected = include_bytes!("../fixtures/delta_expected");
-        let decoder = DeltaDecoder::new(instructions as &[u8], base.to_vec()).expect("wrong base size");
+        let decoder =
+            DeltaDecoder::new(instructions as &[u8], base.to_vec()).expect("wrong base size");
         let mut result = vec![0; decoder.output_size()];
         let mut decoder_stream: DeltaDecoderStream = decoder.into();
 
@@ -220,7 +215,8 @@ mod tests {
     fn can_load() {
         let base = include_bytes!("../fixtures/delta_base");
         let instructions = include_bytes!("../fixtures/delta_instructions");
-        let decoder = DeltaDecoder::new(instructions as &[u8], base.to_vec()).expect("wrong base size");
+        let decoder =
+            DeltaDecoder::new(instructions as &[u8], base.to_vec()).expect("wrong base size");
         let mut decoder_stream: DeltaDecoderStream = decoder.into();
 
         let commit = Commit::load(&mut decoder_stream).expect("failed to read commit");

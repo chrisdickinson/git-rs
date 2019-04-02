@@ -1,10 +1,10 @@
-use crypto::{ sha1::Sha1, digest::Digest };
-use std::io::{ BufRead, Seek, Write };
+use crypto::{digest::Digest, sha1::Sha1};
+use std::io::{BufRead, Seek, Write};
 
-use crate::stores::{ Queryable, StorageSet };
-use crate::errors::{ Result, ErrorKind };
-use crate::pack::read::packfile_read;
+use crate::errors::{ErrorKind, Result};
 use crate::id::Id;
+use crate::pack::read::packfile_read;
+use crate::stores::{Queryable, StorageSet};
 
 pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> {
     index: u32,
@@ -13,7 +13,7 @@ pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryabl
     buffer: Vec<u8>,
     header_buffer: Vec<u8>,
     current_offset: u64,
-    storage_set: Option<&'a StorageSet<S>>
+    storage_set: Option<&'a StorageSet<S>>,
 }
 
 impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a, R, S> {
@@ -22,7 +22,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
         stream.read_exact(&mut magic)?;
 
         if &magic != b"PACK" {
-            return Err(ErrorKind::CorruptedPackfile.into())
+            return Err(ErrorKind::CorruptedPackfile.into());
         }
 
         let mut version_bytes = [0u8; 4];
@@ -31,12 +31,13 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
         let version = unsafe { std::mem::transmute::<[u8; 4], u32>(version_bytes) }.to_be();
         match version {
             2 | 3 => (),
-            _ => return Err(ErrorKind::NotImplemented.into())
+            _ => return Err(ErrorKind::NotImplemented.into()),
         };
 
         let mut object_count_bytes = [0u8; 4];
         stream.read_exact(&mut object_count_bytes)?;
-        let object_count = unsafe { std::mem::transmute::<[u8; 4], u32>(object_count_bytes) }.to_be();
+        let object_count =
+            unsafe { std::mem::transmute::<[u8; 4], u32>(object_count_bytes) }.to_be();
 
         Ok(PackfileIterator {
             index: 0,
@@ -45,20 +46,22 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
             current_offset: 12,
             buffer: Vec::with_capacity(65535),
             header_buffer: Vec::with_capacity(128),
-            stream
+            stream,
         })
     }
 }
 
-use crate::pack::internal_type::PackfileType;
 use crate::objects::Type;
+use crate::pack::internal_type::PackfileType;
 
-impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for PackfileIterator<'a, R, S> {
+impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator
+    for PackfileIterator<'a, R, S>
+{
     type Item = (u64, PackfileType, Option<Id>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.object_count {
-            return None
+            return None;
         }
 
         self.index += 1;
@@ -66,11 +69,8 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
         let offset = self.current_offset;
         let mut bytes_read = 0;
-        let packfile_type = packfile_read(
-            &mut self.stream,
-            &mut self.buffer,
-            &mut bytes_read
-        ).ok()?;
+        let packfile_type =
+            packfile_read(&mut self.stream, &mut self.buffer, &mut bytes_read).ok()?;
 
         self.current_offset += bytes_read;
 
@@ -78,7 +78,13 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
             let object_type: Type = PackfileType::Plain(ident).into();
             let mut hash = Sha1::new();
             self.header_buffer.clear();
-            write!(&mut self.header_buffer, "{} {}\0", object_type.as_str(), self.buffer.len()).ok()?;
+            write!(
+                &mut self.header_buffer,
+                "{} {}\0",
+                object_type.as_str(),
+                self.buffer.len()
+            )
+            .ok()?;
             hash.input(&(self.header_buffer)[..]);
             hash.input(&(self.buffer)[..]);
 
@@ -96,14 +102,15 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
 #[cfg(test)]
 mod tests {
-    use std::io::{ Read, Cursor };
     use super::PackfileIterator;
+    use std::io::{Cursor, Read};
 
     #[test]
     fn does_it_blend() {
         let packfile = include_bytes!("../../fixtures/packfile");
 
-        let packfile_iter: PackfileIterator<_, ()> = PackfileIterator::new(Cursor::new(&packfile[..]), None).expect("failed to parse");
+        let packfile_iter: PackfileIterator<_, ()> =
+            PackfileIterator::new(Cursor::new(&packfile[..]), None).expect("failed to parse");
         for entry in packfile_iter {
             println!("entry: {:?}", entry);
         }

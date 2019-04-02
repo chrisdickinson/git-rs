@@ -1,16 +1,16 @@
-use std::io::Write;
 use std;
+use std::io::Write;
 
-use crate::stores::{ Queryable, StorageSet };
 use crate::errors::Result;
-use crate::objects::Type;
 use crate::id::Id;
+use crate::objects::Type;
+use crate::stores::{Queryable, StorageSet};
 
-pub mod index;
-pub mod mmap;
 pub mod any;
-pub mod iter;
+pub mod index;
 pub mod internal_type;
+pub mod iter;
+pub mod mmap;
 mod read;
 
 #[derive(Debug)]
@@ -18,7 +18,7 @@ pub struct IndexEntry {
     id: Id,
     offset: u64,
     crc32: u32,
-    next: usize
+    next: usize,
 }
 
 impl IndexEntry {
@@ -35,8 +35,14 @@ impl IndexEntry {
     }
 }
 
-pub struct Fanout ([u32; 256]);
+pub struct Fanout([u32; 256]);
 
 pub trait Packfile {
-    fn read_bounds<W: Write, S: Queryable>(&self, start: u64, end: u64, output: &mut W, backends: &StorageSet<S>) -> Result<Type>;
+    fn read_bounds<W: Write, S: Queryable>(
+        &self,
+        start: u64,
+        end: u64,
+        output: &mut W,
+        backends: &StorageSet<S>,
+    ) -> Result<Type>;
 }

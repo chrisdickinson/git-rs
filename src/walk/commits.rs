@@ -1,9 +1,9 @@
-use std::collections::{ HashSet, BinaryHeap };
+use std::collections::{BinaryHeap, HashSet};
 
-use crate::stores::{ Queryable, StorageSet };
+use crate::id::Id;
 use crate::objects::commit::Commit;
 use crate::objects::Object;
-use crate::id::Id;
+use crate::stores::{Queryable, StorageSet};
 
 #[derive(Debug)]
 pub struct IdCommit(Id, Commit);
@@ -32,20 +32,23 @@ impl std::cmp::PartialEq for IdCommit {
     }
 }
 
-impl std::cmp::Eq for IdCommit { }
+impl std::cmp::Eq for IdCommit {}
 
 pub struct CommitIterator<'a, S: Queryable> {
     storage_set: &'a StorageSet<S>,
     seen: HashSet<Id>,
-    target: BinaryHeap<IdCommit>
+    target: BinaryHeap<IdCommit>,
 }
 
 impl<'a, S: Queryable> CommitIterator<'a, S> {
-    pub fn new(storage_set: &'a StorageSet<S>, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<'a, S> {
+    pub fn new(
+        storage_set: &'a StorageSet<S>,
+        id: &Id,
+        seen: Option<HashSet<Id>>,
+    ) -> CommitIterator<'a, S> {
         let mut seen = seen.unwrap_or_else(HashSet::<Id>::new);
 
-        let first = storage_set.get_and_load(id).ok()
-            .unwrap_or(None);
+        let first = storage_set.get_and_load(id).ok().unwrap_or(None);
 
         let mut target = BinaryHeap::with_capacity(4);
 
@@ -83,14 +86,14 @@ impl<'a, S: Queryable> Iterator for CommitIterator<'a, S> {
             let storage_set = &self.storage_set;
             let parents = xs.into_iter().filter_map(|id| {
                 if seen.contains(&id) {
-                    return None
+                    return None;
                 }
 
                 if let Object::Commit(commit) = storage_set.get_and_load(&id).ok()?? {
                     seen.insert(id.clone());
-                    return Some(IdCommit(id, commit))
+                    return Some(IdCommit(id, commit));
                 } else {
-                    return None
+                    return None;
                 }
             });
 

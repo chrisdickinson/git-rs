@@ -2,11 +2,11 @@ use std::fmt;
 use std::fmt::Write;
 use std::iter::FromIterator;
 
-use crate::errors::{ ErrorKind, Error };
+use crate::errors::{Error, ErrorKind};
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Clone, Hash)]
 pub struct Id {
-    bytes: [u8; 20]
+    bytes: [u8; 20],
 }
 
 impl fmt::Debug for Id {
@@ -20,7 +20,7 @@ fn hexencode_byte(inp: u8) -> char {
     match inp {
         0...9 => (inp + 48) as char,
         10...16 => (inp + 87) as char,
-        _ => '@'
+        _ => '@',
     }
 }
 
@@ -36,16 +36,16 @@ impl std::str::FromStr for Id {
     fn from_str(target: &str) -> Result<Self, Self::Err> {
         let trimmed = target.trim();
         if trimmed.len() != 40 {
-            return Err(ErrorKind::BadId.into())
+            return Err(ErrorKind::BadId.into());
         }
 
         let mut id = Id::default();
         for (cursor, xs) in target.bytes().enumerate() {
             let incoming = match xs {
-                48 ... 57 => xs - 48,
-                97 ... 102 => xs - 97 + 10,
-                65 ... 70 => xs - 65 + 10,
-                _ => return Err(ErrorKind::BadId.into())
+                48...57 => xs - 48,
+                97...102 => xs - 97 + 10,
+                65...70 => xs - 65 + 10,
+                _ => return Err(ErrorKind::BadId.into()),
             };
             let to_shift = ((1 + cursor) & 1) << 2;
             id.bytes[cursor >> 1] |= incoming << to_shift;
@@ -71,7 +71,6 @@ impl std::cmp::Ord for Id {
         self.bytes.cmp(&other.bytes)
     }
 }
-
 
 impl std::convert::From<[u8; 20]> for Id {
     fn from(bytes: [u8; 20]) -> Id {
@@ -102,21 +101,23 @@ mod tests {
     use std::str::FromStr;
     #[test]
     fn id_default_works() {
-        let hash : String = super::Id::default().to_string();
+        let hash: String = super::Id::default().to_string();
         assert_eq!(hash, "0000000000000000000000000000000000000000")
     }
 
     #[test]
     fn id_from_hash_works_with_lowercase() {
-        let id = super::Id::from_str("0123456789abcdef000000000000000000000000").expect("Failed to parse hash.");
-        let hash : String = id.to_string();
+        let id = super::Id::from_str("0123456789abcdef000000000000000000000000")
+            .expect("Failed to parse hash.");
+        let hash: String = id.to_string();
         assert_eq!(hash, "0123456789abcdef000000000000000000000000")
     }
 
     #[test]
     fn id_from_hash_works_with_uppercase() {
-        let id = super::Id::from_str("0123456789ABCDEF000000000000000000000000").expect("Failed to parse hash.");
-        let hash : String = id.to_string();
+        let id = super::Id::from_str("0123456789ABCDEF000000000000000000000000")
+            .expect("Failed to parse hash.");
+        let hash: String = id.to_string();
         assert_eq!(hash, "0123456789abcdef000000000000000000000000")
     }
 
