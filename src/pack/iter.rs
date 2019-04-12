@@ -28,7 +28,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
         let mut version_bytes = [0u8; 4];
         stream.read_exact(&mut version_bytes)?;
 
-        let version = unsafe { std::mem::transmute::<[u8; 4], u32>(version_bytes) }.to_be();
+        let version = u32::from_be_bytes(version_bytes);
         match version {
             2 | 3 => (),
             _ => return Err(ErrorKind::NotImplemented.into())
@@ -36,7 +36,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
 
         let mut object_count_bytes = [0u8; 4];
         stream.read_exact(&mut object_count_bytes)?;
-        let object_count = unsafe { std::mem::transmute::<[u8; 4], u32>(object_count_bytes) }.to_be();
+        let object_count = u32::from_be_bytes(object_count_bytes);
 
         Ok(PackfileIterator {
             index: 0,
