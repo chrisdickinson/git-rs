@@ -1,8 +1,10 @@
 [package]
-name = "git-rs"
+name = "git_rs"
 version = "0.1.0"
+description = "A (work in progress) pure rust git implementation."
 authors = ["Chris Dickinson <christopher.s.dickinson@gmail.com>"]
 edition = "2018"
+license = "MIT"
 
 [dependencies]
 hex = "0.3.2"
