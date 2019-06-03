@@ -1,0 +1,37 @@
+## TODO
+
+- [x] Read objects from loose store
+- [x] Read objects from pack store
+    - [x] Read packfile indexes
+    - [x] Read delta'd objects
+    - [x] Fix interface so we don't need to run `open` for each `read()`
+    - [x] **BUG**: certain OFS deltas are misapplied.
+        - [x] Isolate the error case
+        - [x] Fix it
+- [x] Load refs off of disk
+- [x] Parse git signatures ("Identity"'s)
+- [x] Create iterator for walking commit graph
+- [x] Create iterator for walking trees
+    - [ ] Materialize trees to disk (post gitindex?)
+- [x] Create index from packfile
+    - [x] Rename `Storage` trait to `Queryable`
+    - [x] Rework object loading API from `<Type + Boxed reader>` to "we take a writable object"
+        - [x] Carry the rework out through `StorageSet`
+    - [x] Create the index
+    - [x] Wrap it in a nice API
+- [ ] refs v2
+    - [ ] Load refs on demand
+    - [ ] Load packed-refs
+- [ ] `.git/index` support
+    - [ ] Read git index cache
+    - [ ] Write git index cache
+- [ ] Create interface for writing new objects
+- [ ] Add benchmarks
+- [ ] Create packfile from list of objects (API TKTK)
+- [ ] Network protocol
+    - [ ] receive-pack
+    - [ ] send-pack
+- [ ] Try publishing to crates
+    - [ ] Write documentation
+    - [ ] Use crate in another project
+
