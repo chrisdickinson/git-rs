@@ -1,6 +1,6 @@
 use flate2::bufread::ZlibDecoder;
+use std::convert::TryInto;
 use std::io::prelude::*;
-use std;
 
 use crate::pack::internal_type::PackfileType;
 use crate::delta::{ OFS_DELTA, REF_DELTA };
@@ -19,11 +19,8 @@ pub fn packfile_read<R: BufRead, W: Write>(
     let mut size = (byte[0] & 0xf) as u64;
     let mut count = 0;
     let mut continuation = byte[0] & 0x80;
-    loop {
-        if continuation < 1 {
-            break
-        }
 
+    while continuation > 0 {
         input.read_exact(&mut byte)?;
         continuation = byte[0] & 0x80;
 
@@ -31,12 +28,14 @@ pub fn packfile_read<R: BufRead, W: Write>(
         count += 1;
     }
 
+    drop(size);
+
     match obj_type {
-        0...4 => {
+        0..=4 => {
             let mut deflate_stream = ZlibDecoder::new(input);
             std::io::copy(&mut deflate_stream, output)?;
             *read_bytes = 1 + count + deflate_stream.total_in();
-            return Ok(PackfileType::Plain(obj_type));
+            return Ok(PackfileType::Plain(obj_type.try_into()?));
         },
 
         OFS_DELTA => {

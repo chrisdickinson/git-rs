@@ -17,12 +17,12 @@ impl Commit {
         self.message.as_slice()
     }
 
-    pub fn committer(&self) -> Option<&Identity> {
-        if let Some(ref xs) = self.committer {
-            Some(xs)
-        } else {
-            None
-        }
+    pub fn committer(&self) -> &Option<Identity> {
+        &self.committer
+    }
+
+    pub fn author(&self) -> &Option<Identity> {
+        &self.author
     }
 
     pub fn tree(&self) -> Option<Id> {
@@ -56,7 +56,8 @@ impl Commit {
         enum Mode {
             Attr,
             Value
-        };
+        }
+
         let mut anchor = 0;
         let mut space = 0;
         let mut mode = Mode::Attr;

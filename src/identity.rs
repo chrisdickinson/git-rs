@@ -13,6 +13,18 @@ impl Identity {
         &self.at
     }
 
+    pub fn name(&self) -> &[u8] {
+        &self.name
+    }
+
+    pub fn email(&self) -> &[u8] {
+        &self.email
+    }
+
+    pub fn offset(&self) -> FixedOffset {
+        self.offset
+    }
+
     pub fn parse(input: &[u8]) -> Option<Identity> {
 
         #[derive(Debug)]

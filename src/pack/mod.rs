@@ -30,6 +30,10 @@ impl IndexEntry {
         self.crc32
     }
 
+    pub fn next(&self) -> usize {
+        self.next
+    }
+
     pub fn id(&self) -> &Id {
         &self.id
     }

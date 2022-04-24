@@ -18,8 +18,8 @@ impl fmt::Debug for Id {
 #[inline]
 fn hexencode_byte(inp: u8) -> char {
     match inp {
-        0...9 => (inp + 48) as char,
-        10...16 => (inp + 87) as char,
+        0..=9 => (inp + 48) as char,
+        10..=16 => (inp + 87) as char,
         _ => '@'
     }
 }
@@ -42,9 +42,9 @@ impl std::str::FromStr for Id {
         let mut id = Id::default();
         for (cursor, xs) in target.bytes().enumerate() {
             let incoming = match xs {
-                48 ... 57 => xs - 48,
-                97 ... 102 => xs - 97 + 10,
-                65 ... 70 => xs - 65 + 10,
+                48 ..= 57 => xs - 48,
+                97 ..= 102 => xs - 97 + 10,
+                65 ..= 70 => xs - 65 + 10,
                 _ => return Err(ErrorKind::BadId.into())
             };
             let to_shift = ((1 + cursor) & 1) << 2;

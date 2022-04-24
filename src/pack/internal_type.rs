@@ -12,7 +12,7 @@ use crate::id::Id;
 
 #[derive(Debug)]
 pub enum PackfileType {
-    Plain(u8),
+    Plain(Type),
     OffsetDelta((u64, Vec<u8>)),
     RefDelta((Id, Vec<u8>))
 }
@@ -24,7 +24,7 @@ impl PackfileType {
               S: Queryable {
         Ok(match self {
             PackfileType::Plain(t) => {
-                PackfileType::Plain(t).into()
+                t
             },
 
             PackfileType::OffsetDelta((offset, instructions)) => {

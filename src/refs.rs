@@ -28,6 +28,10 @@ pub struct Ref {
 pub struct RefSet(HashMap<String, Ref>);
 
 impl Ref {
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+
     pub fn load(path: &Path, kind: Kind) -> Result<Ref, std::io::Error> {
         let mut f = File::open(path)?;
         let mut buffer = Vec::new();

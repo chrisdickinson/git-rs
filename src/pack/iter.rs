@@ -1,23 +1,22 @@
 use crypto::{ sha1::Sha1, digest::Digest };
 use std::io::{ BufRead, Seek, Write };
 
-use crate::stores::{ Queryable, StorageSet };
+use crate::pack::internal_type::PackfileType;
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::read::packfile_read;
 use crate::id::Id;
 
-pub struct PackfileIterator<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> {
+pub struct PackfileIterator<R: BufRead + Seek + std::fmt::Debug> {
     index: u32,
     object_count: u32,
     stream: R,
     buffer: Vec<u8>,
     header_buffer: Vec<u8>,
     current_offset: u64,
-    storage_set: Option<&'a StorageSet<S>>
 }
 
-impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a, R, S> {
-    pub fn new(mut stream: R, storage_set: Option<&'a StorageSet<S>>) -> Result<Self> {
+impl<R: BufRead + Seek + std::fmt::Debug> PackfileIterator<R> {
+    pub fn new(mut stream: R) -> Result<Self> {
         let mut magic = [0u8; 4];
         stream.read_exact(&mut magic)?;
 
@@ -41,7 +40,6 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
         Ok(PackfileIterator {
             index: 0,
             object_count,
-            storage_set,
             current_offset: 12,
             buffer: Vec::with_capacity(65535),
             header_buffer: Vec::with_capacity(128),
@@ -50,10 +48,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> PackfileIterator<'a,
     }
 }
 
-use crate::pack::internal_type::PackfileType;
-use crate::objects::Type;
-
-impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for PackfileIterator<'a, R, S> {
+impl<R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<R> {
     type Item = (u64, PackfileType, Option<Id>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -74,8 +69,7 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
         self.current_offset += bytes_read;
 
-        let id = if let PackfileType::Plain(ident) = packfile_type {
-            let object_type: Type = PackfileType::Plain(ident).into();
+        let id = if let PackfileType::Plain(object_type) = packfile_type {
             let mut hash = Sha1::new();
             self.header_buffer.clear();
             write!(&mut self.header_buffer, "{} {}\0", object_type.as_str(), self.buffer.len()).ok()?;
@@ -96,14 +90,14 @@ impl<'a, R: BufRead + Seek + std::fmt::Debug, S: Queryable> Iterator for Packfil
 
 #[cfg(test)]
 mod tests {
-    use std::io::{ Read, Cursor };
+    use std::io::Cursor;
     use super::PackfileIterator;
 
     #[test]
     fn does_it_blend() {
         let packfile = include_bytes!("../../fixtures/packfile");
 
-        let packfile_iter: PackfileIterator<_, ()> = PackfileIterator::new(Cursor::new(&packfile[..]), None).expect("failed to parse");
+        let packfile_iter: PackfileIterator<_> = PackfileIterator::new(Cursor::new(&packfile[..])).expect("failed to parse");
         for entry in packfile_iter {
             println!("entry: {:?}", entry);
         }

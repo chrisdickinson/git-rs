@@ -1,4 +1,5 @@
 use crate::pack::internal_type::PackfileType;
+use std::convert::{ TryFrom, From };
 use crate::errors::Result;
 
 pub mod commit;
@@ -21,31 +22,37 @@ pub enum Object {
     Tag(tag::Tag)
 }
 
-impl std::convert::Into<PackfileType> for Type {
-    fn into(self) -> PackfileType {
-        PackfileType::Plain(match self {
-            Type::Commit => 1,
-            Type::Tree => 2,
-            Type::Blob => 3,
-            Type::Tag => 4
-        })
+impl From<Type> for PackfileType {
+    fn from(t: Type) -> PackfileType {
+        PackfileType::Plain(t)
     }
 }
 
-impl std::convert::From<PackfileType> for Type {
-    fn from(t: PackfileType) -> Type {
+use crate::errors::{ ErrorKind, Error };
+
+impl TryFrom<u8> for Type {
+    type Error = Error;
+
+    fn try_from(t: u8) -> Result<Type> {
         match t {
-            PackfileType::Plain(ident) => {
-                match ident {
-                    1 => Type::Commit,
-                    2 => Type::Tree,
-                    3 => Type::Blob,
-                    4 => Type::Tag,
-                    _ => {
-                        panic!("Unknown packfile type")
-                    }
-                }
-            },
+            1 => Ok(Type::Commit),
+            2 => Ok(Type::Tree),
+            3 => Ok(Type::Blob),
+            4 => Ok(Type::Tag),
+
+            _ => Err(ErrorKind::InvalidObjectType.into())
+        }
+    }
+}
+
+
+impl TryFrom<PackfileType> for Type {
+    type Error = Error;
+
+    fn try_from(t: PackfileType) -> Result<Type> {
+        match t {
+            PackfileType::Plain(ident) => Ok(ident),
+
             _ => {
                 panic!("Cannot convert delta packfile type to external type")
             }

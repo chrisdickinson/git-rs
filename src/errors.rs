@@ -16,5 +16,6 @@ error_chain! {
         UnsupportedPackfileIndexVersion
         CorruptedPackfileIndex
         NeedStorageSet
+        InvalidObjectType
     }
 }

@@ -7,7 +7,7 @@ use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
 use crate::id::Id;
 
-type Reader = Fn(&Id) -> Result<Option<Box<std::io::Read>>> + Send + Sync;
+type Reader = dyn Fn(&Id) -> Result<Option<Box<dyn std::io::Read>>> + Send + Sync;
 
 pub struct Store {
     read: Box<Reader>,
@@ -16,7 +16,7 @@ pub struct Store {
 
 impl Store {
     pub fn new<C>(func: C, filter: Option<[bool; 256]>) -> Self
-        where C: Fn(&Id) -> Result<Option<Box<std::io::Read>>> + 'static + Send + Sync {
+        where C: Fn(&Id) -> Result<Option<Box<dyn std::io::Read>>> + 'static + Send + Sync {
         let filter = match filter {
             Some(xs) => xs,
             None => [true; 256]
@@ -46,14 +46,9 @@ impl Queryable for Store {
 
         let mut type_vec = Vec::new();
         let mut size_vec = Vec::new();
-        enum Mode {
-            FindSpace,
-            FindNull
-        };
-        let mut mode = Mode::FindSpace;
 
-        reader.read_until(0x20, &mut type_vec);
-        reader.read_until(0, &mut size_vec);
+        reader.read_until(0x20, &mut type_vec)?;
+        reader.read_until(0, &mut size_vec)?;
 
         let loaded_type = match &type_vec[..] {
             b"commit " => Type::Commit,

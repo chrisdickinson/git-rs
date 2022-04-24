@@ -1,7 +1,7 @@
 use crc::crc32::{ self, Digest as CRCDigest, Hasher32 };
 use crypto::{ sha1::Sha1, digest::Digest };
 use byteorder::{ BigEndian, ReadBytesExt };
-use std::io::{ Cursor, SeekFrom };
+use std::io::{ SeekFrom };
 use std::io::prelude::*;
 use rayon::prelude::*;
 use std::fmt::Debug;
@@ -23,7 +23,7 @@ pub fn write<R, W, S>(
     let len = input.seek(SeekFrom::End(0))?;
     input.seek(SeekFrom::Start(0))?;
 
-    let iter = PackfileIterator::new(input.clone(), storage_set).expect("failed to parse as packfile");
+    let iter = PackfileIterator::new(input.clone()).expect("failed to parse as packfile");
     let mut offsets = Vec::with_capacity(4096);
 
     // first pass: find all offsets and non-delta'd ids
@@ -165,11 +165,11 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     let mut version = [0u8; 4];
     input.read_exact(&mut version)?;
 
-    if (&magic != b"\xfftOc") {
+    if &magic != b"\xfftOc" {
         return Err(ErrorKind::InvalidPackfileIndex.into())
     }
 
-    if (version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) }) {
+    if version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) } {
         return Err(ErrorKind::UnsupportedPackfileIndexVersion.into())
     }
 
@@ -238,7 +238,11 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn get_bounds (&self, id: &Id) -> Option<(u64, u64)> {
+    pub fn crcs(&self) -> &[u32] {
+        &self.crcs
+    }
+
+    pub fn get_bounds(&self, id: &Id) -> Option<(u64, u64)> {
         let as_bytes: &[u8] = id.as_ref();
         let mut lo = if as_bytes[0] > 0 {
             self.fanout[(as_bytes[0] - 1) as usize]
