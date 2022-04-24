@@ -24,8 +24,8 @@ impl Packfile for Reader {
         let mut cursor = Cursor::new(&self.mmap[ .. end as usize]);
         cursor.seek(SeekFrom::Start(start))?;
 
-        let packfile_type = packfile_read(&mut cursor, output, &mut 0)?;
-        let obj_type = packfile_type.decompress(
+        let packfile_entry_meta = packfile_read(&mut cursor, output, &mut 0)?;
+        let obj_type = packfile_entry_meta.decompress(
             start,
             &mut cursor,
             output,

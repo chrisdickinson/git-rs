@@ -36,8 +36,8 @@ impl<R: Read + Seek + std::fmt::Debug> Packfile for Reader<R> {
         let mut buffered_file = BufReader::new(handle);
         buffered_file.seek(SeekFrom::Start(start))?;
 
-        let packfile_type = packfile_read(&mut buffered_file, output, &mut 0)?;
-        let obj_type = packfile_type.decompress(
+        let meta = packfile_read(&mut buffered_file, output, &mut 0)?;
+        let obj_type = meta.decompress(
             start,
             &mut buffered_file,
             output,

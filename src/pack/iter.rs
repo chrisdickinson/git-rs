@@ -2,6 +2,7 @@ use crypto::{ sha1::Sha1, digest::Digest };
 use std::io::{ BufRead, Seek, Write };
 
 use crate::pack::internal_type::PackfileType;
+use crate::pack::read::PackfileEntryMeta;
 use crate::errors::{ Result, ErrorKind };
 use crate::pack::read::packfile_read;
 use crate::id::Id;
@@ -49,7 +50,7 @@ impl<R: BufRead + Seek + std::fmt::Debug> PackfileIterator<R> {
 }
 
 impl<R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<R> {
-    type Item = (u64, PackfileType, Option<Id>);
+    type Item = (u64, PackfileEntryMeta, Option<Id>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.object_count {
@@ -61,7 +62,7 @@ impl<R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<R> {
 
         let offset = self.current_offset;
         let mut bytes_read = 0;
-        let packfile_type = packfile_read(
+        let meta = packfile_read(
             &mut self.stream,
             &mut self.buffer,
             &mut bytes_read
@@ -69,7 +70,7 @@ impl<R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<R> {
 
         self.current_offset += bytes_read;
 
-        let id = if let PackfileType::Plain(object_type) = packfile_type {
+        let id = if let PackfileType::Plain(object_type) = meta.expected_type() {
             let mut hash = Sha1::new();
             self.header_buffer.clear();
             write!(&mut self.header_buffer, "{} {}\0", object_type.as_str(), self.buffer.len()).ok()?;
@@ -84,7 +85,7 @@ impl<R: BufRead + Seek + std::fmt::Debug> Iterator for PackfileIterator<R> {
             None
         };
 
-        Some((offset, packfile_type, id))
+        Some((offset, meta, id))
     }
 }
 

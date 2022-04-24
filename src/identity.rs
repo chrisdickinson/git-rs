@@ -40,11 +40,10 @@ impl Identity {
         let mut mode = Mode::FindOffset;
 
         // Chris Dickinson <christopher.s.dickinson@gmail.com> 1546491006 -0800
-        for positive_index in 0 .. input.len() {
-            let idx = input.len() - positive_index - 1;
+        for (idx, &ch) in input.iter().enumerate().rev() {
             mode = match mode {
                 Mode::FindOffset => {
-                    if input[idx] == 32 {
+                    if ch == b' ' {
                         Mode::FindTimestamp(idx)
                     } else {
                         Mode::FindOffset
@@ -52,7 +51,7 @@ impl Identity {
                 },
 
                 Mode::FindTimestamp(a) => {
-                    if input[idx] == 32 {
+                    if ch == b' ' {
                         Mode::FindEmailEnd((idx, a))
                     } else {
                         Mode::FindTimestamp(a)
@@ -60,15 +59,15 @@ impl Identity {
                 },
 
                 Mode::FindEmailEnd((a, b)) => {
-                    if input[idx] == 62 {
-                        Mode::FindEmailStart((idx - 1, a, b))
+                    if ch == b'>' {
+                        Mode::FindEmailStart((idx, a, b))
                     } else {
                         Mode::FindEmailEnd((a, b))
                     }
                 },
 
                 Mode::FindEmailStart((a, b, c)) => {
-                    if input[idx] == 60 {
+                    if ch == b'<' {
                         Mode::FindNameEnd((idx + 1, a, b, c))
                     } else {
                         Mode::FindEmailStart((a, b, c))
@@ -76,7 +75,7 @@ impl Identity {
                 },
 
                 Mode::FindNameEnd((a, b, c, d)) => {
-                    if input[idx] != 32 {
+                    if ch != b' ' {
                         Mode::Done((idx, a, b, c, d))
                     } else {
                         Mode::FindNameEnd((a, b, c, d))
@@ -137,5 +136,8 @@ mod tests {
 
         let ident = Identity::parse(&bytes);
         assert_eq!(ident.is_some(), true);
+
+        let ident = ident.unwrap();
+        assert_eq!(ident.email(), b"christopher.s.dickinson@gmail.com");
     }
 }
