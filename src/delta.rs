@@ -1,6 +1,5 @@
-use std;
-
 use crate::errors::{ ErrorKind, Result };
+
 use std::io::Write;
 
 pub const OFS_DELTA: u8 = 6;

@@ -1,5 +1,4 @@
 use std::io::Write;
-use std;
 
 use crate::stores::{ Queryable, StorageSet };
 use crate::errors::Result;

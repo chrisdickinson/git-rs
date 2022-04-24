@@ -1,7 +1,6 @@
 use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::fmt::Debug;
-use std;
 
 use crate::delta::{ DeltaDecoder, DeltaDecoderStream };
 use crate::stores::{ Queryable, StorageSet };

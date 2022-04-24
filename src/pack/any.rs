@@ -1,6 +1,5 @@
 use std::io::{ BufReader, SeekFrom };
 use std::io::{ Read, Write, Seek };
-use std;
 
 use crate::stores::{ Queryable, StorageSet };
 use crate::pack::read::packfile_read;
