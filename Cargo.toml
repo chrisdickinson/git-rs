@@ -17,6 +17,7 @@ rust-crypto = "0.2.36"
 rayon = "1.0.3"
 lru = "0.1.11"
 crc = "^1.0.0"
+once_cell = "1.10.0"
 
 [lib]
 name = "git_rs"

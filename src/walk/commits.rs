@@ -9,14 +9,19 @@ use crate::id::Id;
 pub struct IdCommit(Id, Commit);
 
 impl std::cmp::Ord for IdCommit {
-    fn cmp(&self, other: &IdCommit) -> std::cmp::Ordering {
-        if let Some(ref rhs) = self.1.committer() {
-            if let Some(ref lhs) = other.1.committer() {
-                return rhs.at().cmp(lhs.at());
-            }
-        }
+    fn cmp(&self, next: &IdCommit) -> std::cmp::Ordering {
+        let lhs = self.1.committer();
+        let rhs = next.1.committer();
 
-        std::cmp::Ordering::Equal
+        match (lhs, rhs) {
+            (Some(lhs), Some(rhs)) => {
+                match (lhs.timestamp(), rhs.timestamp()) {
+                    (Some(lhs), Some(rhs)) => lhs.cmp(rhs),
+                    _ => std::cmp::Ordering::Equal
+                }
+            },
+            _ => std::cmp::Ordering::Equal
+        }
     }
 }
 

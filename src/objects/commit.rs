@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
-use crate::identity::Identity;
+use crate::human_metadata::HumanMetadata;
 use crate::errors::Result;
 use crate::id::Id;
 
 #[derive(Debug)]
 pub struct Commit {
     attributes: HashMap<Vec<u8>, Vec<Vec<u8>>>,
-    committer: Option<Identity>,
-    author: Option<Identity>,
+    committer: Option<HumanMetadata>,
+    author: Option<HumanMetadata>,
     message: Vec<u8>
 }
 
@@ -17,11 +17,11 @@ impl Commit {
         self.message.as_slice()
     }
 
-    pub fn committer(&self) -> &Option<Identity> {
+    pub fn committer(&self) -> &Option<HumanMetadata> {
         &self.committer
     }
 
-    pub fn author(&self) -> &Option<Identity> {
+    pub fn author(&self) -> &Option<HumanMetadata> {
         &self.author
     }
 
@@ -48,7 +48,7 @@ impl Commit {
         // attr SP value NL
         // NL
         // message
-        let mut vec = Vec::new();
+        let mut vec = Vec::with_capacity(512);
         handle.read_to_end(&mut vec)?;
         let buf = &vec;
 
@@ -106,21 +106,13 @@ impl Commit {
 
         let message = buf[message_idx..].to_vec();
 
-        let committer = attributes.get(b"committer" as &[u8]).and_then(|xs| {
-            if !xs.is_empty() {
-                Identity::parse(xs[0].as_slice())
-            } else {
-                None
-            }
-        });
+        let committer = attributes.get_mut(b"committer" as &[u8]).and_then(|xs| {
+            xs.pop()
+        }).map(HumanMetadata::new);
 
-        let author = attributes.get(b"author" as &[u8]).and_then(|xs| {
-            if !xs.is_empty() {
-                Identity::parse(xs[0].as_slice())
-            } else {
-                None
-            }
-        });
+        let author = attributes.get_mut(b"author" as &[u8]).and_then(|xs| {
+            xs.pop()
+        }).map(HumanMetadata::new);
 
         Ok(Commit {
             attributes,

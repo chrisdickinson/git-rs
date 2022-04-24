@@ -9,7 +9,7 @@ pub mod objects;
 pub mod pack;
 pub mod refs;
 pub mod walk;
-pub mod identity;
+pub mod human_metadata;
 
 #[cfg(test)]
 mod tests {
