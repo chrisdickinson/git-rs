@@ -41,48 +41,27 @@ impl Identity {
 
         // Chris Dickinson <christopher.s.dickinson@gmail.com> 1546491006 -0800
         for (idx, &ch) in input.iter().enumerate().rev() {
-            mode = match mode {
-                Mode::FindOffset => {
-                    if ch == b' ' {
-                        Mode::FindTimestamp(idx)
-                    } else {
-                        Mode::FindOffset
-                    }
-                },
+            mode = match (ch, mode) {
+                (b' ', Mode::FindOffset)                => Mode::FindTimestamp(idx),
+                (_,    Mode::FindOffset)                => Mode::FindOffset,
 
-                Mode::FindTimestamp(a) => {
-                    if ch == b' ' {
-                        Mode::FindEmailEnd((idx, a))
-                    } else {
-                        Mode::FindTimestamp(a)
-                    }
-                },
+                (b' ', Mode::FindTimestamp(a))          => Mode::FindEmailEnd((idx, a)),
+                (_,    Mode::FindTimestamp(a))          => Mode::FindTimestamp(a),
 
-                Mode::FindEmailEnd((a, b)) => {
-                    if ch == b'>' {
-                        Mode::FindEmailStart((idx, a, b))
-                    } else {
-                        Mode::FindEmailEnd((a, b))
-                    }
-                },
+                (b'>', Mode::FindEmailEnd((a, b)))      => Mode::FindEmailStart((idx, a, b)),
+                (_,    Mode::FindEmailEnd((a, b)))      => Mode::FindEmailEnd((a, b)),
 
-                Mode::FindEmailStart((a, b, c)) => {
-                    if ch == b'<' {
-                        Mode::FindNameEnd((idx + 1, a, b, c))
-                    } else {
-                        Mode::FindEmailStart((a, b, c))
-                    }
-                },
+                (b'<', Mode::FindEmailStart((a, b, c))) => Mode::FindNameEnd((idx + 1, a, b, c)),
+                (_,    Mode::FindEmailStart((a, b, c))) => Mode::FindEmailStart((a, b, c)),
 
-                Mode::FindNameEnd((a, b, c, d)) => {
-                    if ch != b' ' {
-                        Mode::Done((idx, a, b, c, d))
-                    } else {
-                        Mode::FindNameEnd((a, b, c, d))
-                    }
-                },
+                (b' ', Mode::FindNameEnd((a, b, c, d))) => Mode::FindNameEnd((a, b, c, d)),
+                (_,    Mode::FindNameEnd((a, b, c, d))) => Mode::Done((idx, a, b, c, d)),
 
-                Mode::Done(_) => break
+                (_,    mode @ Mode::Done(_)) => mode
+            };
+
+            if let Mode::Done(_) = &mode {
+                break
             }
         }
 
