@@ -10,7 +10,6 @@ use crate::stores::{ Queryable, StorageSet };
 use crate::delta::{ OFS_DELTA, REF_DELTA };
 use crate::errors::{ Result, ErrorKind };
 use crate::objects::Type;
-use crate::id::Id;
 
 #[derive(Debug)]
 pub struct PackfileEntryMeta {
@@ -141,7 +140,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
         REF_DELTA => {
             let mut ref_bytes = [0u8; 20];
             input.read_exact(&mut ref_bytes)?;
-            let id = Id::from(&ref_bytes);
+            let id = ref_bytes.into();
 
             let mut deflate_stream = ZlibDecoder::new(input);
             let mut instructions = Vec::new();

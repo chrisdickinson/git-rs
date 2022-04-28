@@ -1,9 +1,10 @@
 use crc::crc32::{ self, Digest as CRCDigest, Hasher32 };
 use crypto::{ sha1::Sha1, digest::Digest };
 use byteorder::{ BigEndian, ReadBytesExt };
-use std::io::{ SeekFrom };
+use std::convert::TryInto;
 use std::io::prelude::*;
 use rayon::prelude::*;
+use std::io::SeekFrom;
 use std::fmt::Debug;
 
 use crate::stores::{ StorageSet, Queryable };
@@ -73,7 +74,7 @@ pub fn write<R, W, S>(
         hash.input(&output[..]);
         let mut id_output = [0u8; 20];
         hash.result(&mut id_output);
-        Some((idx, offset, Id::from(&id_output[..])))
+        Some((idx, offset, id_output.into()))
     }).collect();
 
     // sort the results by id hash (instead of offset order)
@@ -181,9 +182,13 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     let mut oid_bytes_vec = vec!(0u8; object_count * 20);
     input.read_exact(&mut oid_bytes_vec.as_mut_slice())?;
 
-    let ids: Vec<Id> = oid_bytes_vec.chunks(20).map(
-        |chunk| Id::from(chunk)
+    let ids: Vec<Id> = oid_bytes_vec.chunks_exact(20).filter_map(
+        |chunk| chunk.try_into().ok()
     ).collect();
+
+    if ids.len() != object_count {
+        return Err(ErrorKind::InvalidPackfileIndex.into())
+    }
 
     let mut crc_vec = vec!(0u32; object_count);
     input.read_u32_into::<BigEndian>(&mut crc_vec.as_mut_slice())?;

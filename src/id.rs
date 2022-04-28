@@ -1,17 +1,19 @@
-use std::fmt;
-use std::fmt::Write;
-use std::iter::FromIterator;
+use std::str::FromStr;
+use std::fmt::{ Display, Write };
+use std::convert::{ From, TryFrom };
 
 use crate::errors::{ ErrorKind, Error };
 
-#[derive(Default, PartialEq, Eq, PartialOrd, Clone, Hash)]
+#[derive(Default, Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Hash)]
 pub struct Id {
     bytes: [u8; 20]
 }
 
-impl fmt::Debug for Id {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+impl Id {
+    pub fn new<T: AsRef<[u8]>>(bytes: T) -> Id {
+        let mut id = Id::default();
+        id.bytes.copy_from_slice(bytes.as_ref());
+        id
     }
 }
 
@@ -30,7 +32,7 @@ impl AsRef<[u8]> for Id {
     }
 }
 
-impl std::str::FromStr for Id {
+impl FromStr for Id {
     type Err = Error;
 
     fn from_str(target: &str) -> Result<Self, Self::Err> {
@@ -55,8 +57,8 @@ impl std::str::FromStr for Id {
     }
 }
 
-impl fmt::Display for Id {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for byte in &self.bytes {
             f.write_char(hexencode_byte((byte >> 4) & 0x0fu8))?;
             f.write_char(hexencode_byte(byte & 0x0f))?;
@@ -66,35 +68,22 @@ impl fmt::Display for Id {
     }
 }
 
-impl std::cmp::Ord for Id {
-    fn cmp(&self, other: &Id) -> std::cmp::Ordering {
-        self.bytes.cmp(&other.bytes)
-    }
-}
-
-
-impl std::convert::From<[u8; 20]> for Id {
+impl From<[u8; 20]> for Id {
     fn from(bytes: [u8; 20]) -> Id {
         Id { bytes }
     }
 }
 
-impl Id {
-    pub fn from(bytes: &[u8]) -> Id {
-        let mut id = Id::default();
-        id.bytes.copy_from_slice(bytes);
-        id
-    }
-
-    pub fn to_string(&self) -> String {
-        let mut output = Vec::with_capacity(40);
-        for byte in &self.bytes {
-            output.push(hexencode_byte((byte >> 4) & 0x0fu8));
-            output.push(hexencode_byte(byte & 0x0f));
+impl TryFrom<&[u8]> for Id {
+    fn try_from(bytes: &[u8]) -> Result<Id, Error> {
+        if bytes.len() < 20 {
+            Err(ErrorKind::BadId.into())
+        } else {
+            Ok(Id::new(bytes))
         }
-
-        String::from_iter(output)
     }
+
+    type Error = Error;
 }
 
 #[cfg(test)]

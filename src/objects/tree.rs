@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use crate::errors::Result;
 use crate::id::Id;
 
@@ -77,7 +78,7 @@ impl Tree {
 
                         entries.insert(name, TreeEntry {
                             mode: FileMode(mode),
-                            id: Id::from(&buf[null + 1..=idx])
+                            id: (&buf[null + 1..=idx]).try_into()?
                         });
 
                         anchor = idx + 1;
