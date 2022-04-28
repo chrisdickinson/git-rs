@@ -1,7 +1,6 @@
 use crc::crc32::{ self, Digest as CRCDigest, Hasher32 };
 use crypto::{ sha1::Sha1, digest::Digest };
 use byteorder::{ BigEndian, ReadBytesExt };
-use std::convert::TryInto;
 use std::io::prelude::*;
 use rayon::prelude::*;
 use std::io::SeekFrom;
@@ -24,7 +23,7 @@ pub fn write<R, W, S>(
     let len = input.seek(SeekFrom::End(0))?;
     input.seek(SeekFrom::Start(0))?;
 
-    let iter = PackfileIterator::new(input.clone()).expect("failed to parse as packfile");
+    let iter = PackfileIterator::new(input.clone())?;
     let mut offsets = Vec::with_capacity(4096);
 
     // first pass: find all offsets and non-delta'd ids
@@ -179,16 +178,7 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
 
     let object_count = fanout[255] as usize;
 
-    let mut oid_bytes_vec = vec!(0u8; object_count * 20);
-    input.read_exact(&mut oid_bytes_vec.as_mut_slice())?;
-
-    let ids: Vec<Id> = oid_bytes_vec.chunks_exact(20).filter_map(
-        |chunk| chunk.try_into().ok()
-    ).collect();
-
-    if ids.len() != object_count {
-        return Err(ErrorKind::InvalidPackfileIndex.into())
-    }
+    let ids = Id::read_packed_ids(&mut input, object_count)?;
 
     let mut crc_vec = vec!(0u32; object_count);
     input.read_u32_into::<BigEndian>(&mut crc_vec.as_mut_slice())?;

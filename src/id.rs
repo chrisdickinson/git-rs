@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::str::FromStr;
 use std::fmt::{ Display, Write };
 use std::convert::{ From, TryFrom };
@@ -5,6 +6,7 @@ use std::convert::{ From, TryFrom };
 use crate::errors::{ ErrorKind, Error };
 
 #[derive(Default, Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Hash)]
+#[repr(transparent)]
 pub struct Id {
     bytes: [u8; 20]
 }
@@ -14,6 +16,19 @@ impl Id {
         let mut id = Id::default();
         id.bytes.copy_from_slice(bytes.as_ref());
         id
+    }
+
+    pub fn read_packed_ids<R: Read>(input: &mut R, count: usize) -> crate::errors::Result<Vec<Id>> {
+        let mut ids: Vec<Id> = vec![Id::default(); count];
+
+        // Do some crimes here. We need to read in a list of tightly-packed ids, so we pre-allocate
+        // the exact number of ids we expect. Then we get a pointer to that list of ids, pun it to
+        // a mut u8 slice, and pass it to read_exact.
+        let slice = ids.as_mut_slice();
+        let ptr: *mut Id = slice.as_mut_ptr();
+        let bytes_ptr = ptr as *mut u8;
+        input.read_exact(unsafe { std::slice::from_raw_parts_mut(bytes_ptr, count * 20) })?;
+        Ok(ids)
     }
 }
 
