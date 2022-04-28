@@ -51,18 +51,18 @@ impl ParsedHumanMetadata {
         for (idx, &ch) in input.iter().enumerate().rev() {
             mode = match (ch, mode) {
                 (b' ', Mode::FindOffset)                => Mode::FindTimestamp(idx),
-                (_,    Mode::FindOffset)                => Mode::FindOffset,
+                (_,    x @ Mode::FindOffset)            => x,
 
                 (b' ', Mode::FindTimestamp(a))          => Mode::FindEmailEnd((idx, a)),
-                (_,    Mode::FindTimestamp(a))          => Mode::FindTimestamp(a),
+                (_,    x @ Mode::FindTimestamp(_))      => x,
 
                 (b'>', Mode::FindEmailEnd((a, b)))      => Mode::FindEmailStart((idx, a, b)),
-                (_,    Mode::FindEmailEnd((a, b)))      => Mode::FindEmailEnd((a, b)),
+                (_,    x @ Mode::FindEmailEnd(_))       => x,
 
                 (b'<', Mode::FindEmailStart((a, b, c))) => Mode::FindNameEnd((idx + 1, a, b, c)),
-                (_,    Mode::FindEmailStart((a, b, c))) => Mode::FindEmailStart((a, b, c)),
+                (_,    x @ Mode::FindEmailStart(_))     => x,
 
-                (b' ', Mode::FindNameEnd((a, b, c, d))) => Mode::FindNameEnd((a, b, c, d)),
+                (b' ', x @ Mode::FindNameEnd(_))        => x,
                 (_,    Mode::FindNameEnd((a, b, c, d))) => Mode::Done((idx, a, b, c, d)),
 
                 (_,    mode @ Mode::Done(_)) => mode
