@@ -47,6 +47,42 @@ Rust" (Blandy, Orendorff).
 
 ## PLAN
 
+### 2022-04-27 Update
+
+- I'm back! I finally have some free time (and, maybe more importantly, _available attention_) so I'm revisiting this
+  project after a few years.
+- Most recently, I fixed a bug with the "identity" parser. "Identities" are the bits of commit and tag metadata that look
+  roughly like `Humanname <email> 10100100100 +7300`.
+    - It turns out my parsing had a bug: it was dropping the last character of the email.
+    - This was surfaced to me -- not by tests as it should have been, to my embarrassment -- but by trying to run `git_rs_log`
+      against the Node repository. It turns out someone had committed without an email: `Foobar <> 1010020203 -4000`.
+    - My off-by-one error turned this into a panic, with the program safely -- if unexpectedly -- crashing on that input.
+    - I fixed the parser bug and golfed the parser itself down [using `match` statements and constants](https://github.com/chrisdickinson/git-rs/commit/a8fefd7db9817724b9202fac41cb9f4183229920).
+- While I was in that part of the code, I did a little editorializing: renaming `identity` to `human_metadata`.
+- I also took the oppportunity to _lazily_ parse the human metadata. There's no need to walk that entire bytestring unless
+  someone asks for it.
+    - It turns out that we _do_ ask for it during the course of `git log`: if we have multiple branches we need to load up
+      the commit metadata to compare timestamps, as the output order depends on commit timestamp.
+    - But for straightline chains of commits we don't need to load any of that up.
+        - This saves ~10-20 milliseconds on `git log` in the node repository.
+- Burying the lede: `git_rs_log` is about 100-200ms slower than `git log --pretty=oneline`, run against the node repository.
+    - Well, that certainly seems like a useful north star, does it not?
+    - Where are we spending time that git _isn't_?
+- Buoyed by my recent deep dive into the LLVM ecosystem, I briefly explored profile-guided optimization.
+    - I'm happy to report that I got a working setup and understood the results.
+    - I'm less happy to report that, well, the results weren't stunning. This kind of checks out: if the performance gap
+      is down to the number of I/O system calls we're making, assuming git makes fewer system calls that's where our perf
+      gap will be.
+    - So that's my current number one goal.
+- My number two goal is to modernize this repo and bring it up to the Rust
+  standards that I picked up from $dayjob (and in particular, via
+  [**@fishrock123**](https://github.com/fishrock123).)
+    - That means:
+        - implementing more standard traits on types,
+        - adding integration tests,
+        - adding type docs,
+        - and being a little bit more circumspect about what the crate exposes as a public API.
+
 ### 2019-02-08 Update
 
 - **It's been a minute!**
