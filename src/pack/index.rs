@@ -28,7 +28,7 @@ pub fn write<R, W, S>(
 
     // first pass: find all offsets and non-delta'd ids
     let objects: Vec<_> = iter.map(|(offset, pf_type, id)| {
-        offsets.push(offset.clone());
+        offsets.push(offset);
         (offset, pf_type, id)
     }).collect();
     offsets.push(len - 20);
@@ -55,8 +55,8 @@ pub fn write<R, W, S>(
                         .into_par_iter()
                         .enumerate()
                         .filter_map(|(idx, (offset, pf_type, id))| {
-        if id.is_some() {
-            return Some((idx, offset, id.unwrap()))
+        if let Some(id) = id {
+            return Some((idx, offset, id))
         }
 
         let mut input = input.clone();
@@ -111,38 +111,38 @@ pub fn write<R, W, S>(
 
     let magic_byte = b"\xfftOc";
     shasum.input(magic_byte);
-    output.write(magic_byte)?;
+    output.write_all(magic_byte)?;
 
-    let version_bytes = unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) };
+    let version_bytes = 2u32.to_be().to_ne_bytes();
     shasum.input(&version_bytes);
-    output.write(&version_bytes)?;
+    output.write_all(&version_bytes)?;
 
     let fanout_bytes = unsafe { std::mem::transmute::<[u32; 256], [u8; 256 * 4]>(fanout) };
     shasum.input(&fanout_bytes);
-    output.write(&fanout_bytes)?;
+    output.write_all(&fanout_bytes)?;
 
     for id in ids {
         let id_bytes = id.as_ref();
         shasum.input(id_bytes);
-        output.write(id_bytes)?;
+        output.write_all(id_bytes)?;
     }
 
     for crc in crcs_out {
-        let crc_bytes = unsafe { std::mem::transmute::<u32, [u8; 4]>(crc) };
+        let crc_bytes = crc.to_be().to_ne_bytes();
         shasum.input(&crc_bytes);
-        output.write(&crc_bytes)?;
+        output.write_all(&crc_bytes)?;
     }
 
     for offset in offsets {
-        let offset_bytes = unsafe { std::mem::transmute::<u32, [u8; 4]>(offset) };
+        let offset_bytes = offset.to_be().to_ne_bytes();
         shasum.input(&offset_bytes);
-        output.write(&offset_bytes)?;
+        output.write_all(&offset_bytes)?;
     }
 
     for large_offset in large_offsets {
-        let large_offset_bytes = unsafe { std::mem::transmute::<u64, [u8; 8]>(large_offset) };
+        let large_offset_bytes = large_offset.to_be().to_ne_bytes();
         shasum.input(&large_offset_bytes);
-        output.write(&large_offset_bytes)?;
+        output.write_all(&large_offset_bytes)?;
     }
 
     input.seek(SeekFrom::End(-20))?;
@@ -150,11 +150,11 @@ pub fn write<R, W, S>(
 
     input.read_to_end(&mut packfile_checksum_bytes)?;
     shasum.input(&packfile_checksum_bytes);
-    output.write(&packfile_checksum_bytes)?;
+    output.write_all(&packfile_checksum_bytes)?;
 
     let mut checksum = [0u8; 20];
     shasum.result(&mut checksum);
-    output.write(&checksum)?;
+    output.write_all(&checksum)?;
 
     Ok(())
 }
@@ -169,7 +169,7 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
         return Err(ErrorKind::InvalidPackfileIndex.into())
     }
 
-    if version != unsafe { std::mem::transmute::<u32, [u8; 4]>(2u32.to_be()) } {
+    if version != 2u32.to_be().to_ne_bytes() {
         return Err(ErrorKind::UnsupportedPackfileIndexVersion.into())
     }
 
@@ -181,10 +181,10 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     let ids = Id::read_packed_ids(&mut input, object_count)?;
 
     let mut crc_vec = vec!(0u32; object_count);
-    input.read_u32_into::<BigEndian>(&mut crc_vec.as_mut_slice())?;
+    input.read_u32_into::<BigEndian>(crc_vec.as_mut_slice())?;
 
     let mut offsets_vec = vec!(0u32; object_count);
-    input.read_u32_into::<BigEndian>(&mut offsets_vec.as_mut_slice())?;
+    input.read_u32_into::<BigEndian>(offsets_vec.as_mut_slice())?;
 
     let mut large_offset_count = 0;
     for offset in offsets_vec.iter() {

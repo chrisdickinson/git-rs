@@ -64,35 +64,35 @@ impl<Q: Queryable> StorageSet<Q> {
     }
 
     pub fn get<W: Write>(&self, id: &Id, output: &mut W) -> Result<Option<Type>> {
-        self.backend.get(id, output, &self)
+        self.backend.get(id, output, self)
     }
 
     pub fn commits(&self, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<Q> {
-        CommitIterator::new(&self, id, seen)
+        CommitIterator::new(self, id, seen)
     }
 
     pub fn tree(&self, id: &Id) -> TreeIterator<Q> {
         let result = match self.get_and_load(id) {
             Ok(xs) => xs,
-            Err(_) => return TreeIterator::new(&self, vec![])
+            Err(_) => return TreeIterator::new(self, vec![])
         };
 
         if result.is_none() {
-            return TreeIterator::new(&self, vec![])
+            return TreeIterator::new(self, vec![])
         }
 
         match result.unwrap() {
             Object::Commit(commit) => {
                 match commit.tree() {
                     Some(tree) => self.tree(&tree),
-                    None => TreeIterator::new(&self, vec![])
+                    None => TreeIterator::new(self, vec![])
                 }
             },
             Object::Tree(tree) => {
-                TreeIterator::new(&self, vec![tree.into_iter()])
+                TreeIterator::new(self, vec![tree.into_iter()])
             },
             _ => {
-                TreeIterator::new(&self, vec![])
+                TreeIterator::new(self, vec![])
             }
         }
     }

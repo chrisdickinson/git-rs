@@ -4,10 +4,13 @@ use crate::pack::mmap::Reader as MmapPackReader;
 use crate::stores::pack::{ Store as PackStore };
 use crate::stores::StorageSet;
 use memmap::MmapOptions;
+use rayon::prelude::*;
 
 use std::path::Path;
 
-pub fn from(path: &Path) -> Result<StorageSet<(Vec<PackStore<MmapPackReader>>, LooseStore)>, std::io::Error> {
+type GitFSStore = (Vec<PackStore<MmapPackReader>>, LooseStore);
+
+pub fn from(path: &Path) -> Result<StorageSet<GitFSStore>, std::io::Error> {
     let packfiles = packfiles_from_path(path)?;
     let loose = loose_from_path(path)?;
 
@@ -41,14 +44,14 @@ pub fn loose_from_path(path: &Path) -> Result<LooseStore, std::io::Error> {
     let loose_store = LooseStore::new(move |id| {
         let as_str = id.to_string();
         let mut pb = root.clone();
-        pb.push(as_str[0..2].to_string());
-        pb.push(as_str[2..40].to_string());
+        pb.push(&as_str[0..2]);
+        pb.push(&as_str[2..40]);
         match std::fs::File::open(pb.as_path()) {
             Ok(f) => Ok(Some(Box::new(f))),
             Err(e) => {
                 match e.kind() {
                     std::io::ErrorKind::NotFound => Ok(None),
-                    _ => Err(e)?
+                    _ => Err(e.into())
                 }
             }
         }
@@ -58,26 +61,26 @@ pub fn loose_from_path(path: &Path) -> Result<LooseStore, std::io::Error> {
 }
 
 pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>, std::io::Error> {
-    let mut stores = vec![];
     let mut root = std::path::PathBuf::new();
     root.push(path);
     root.push(".git");
     root.push("objects");
     root.push("pack");
 
-    for entry in std::fs::read_dir(root.as_path())? {
-        let entry = entry?;
+    let candidates: Vec<_> = std::fs::read_dir(root.as_path())?.filter_map(|entry| {
+        let entry = entry.ok()?;
         let os_filename = entry.file_name();
         let filename = os_filename.to_str();
-        if filename.is_none() {
-            continue
+
+        if !filename?.ends_with(".idx") {
+            return None
         }
 
-        if !filename.unwrap().ends_with(".idx") {
-            continue
-        }
+        Some(entry)
+    }).collect();
 
-        let entry_path = entry.path();
+    let stores: Vec<PackStore<MmapPackReader>> = candidates.into_par_iter().map(|entry|  -> Result<PackStore<MmapPackReader>, std::io::Error> {
+        let mut entry_path = entry.path();
 
         let index_file = std::fs::File::open(entry_path.clone())?;
         let index_mmap = unsafe { MmapOptions::new().map(&index_file)? };
@@ -86,14 +89,14 @@ pub fn packfiles_from_path(path: &Path) -> Result<Vec<PackStore<MmapPackReader>>
             Err(_) => return Err(std::io::ErrorKind::InvalidData.into())
         };
 
-        let mut epb = entry_path.to_path_buf();
-        epb.set_extension("pack");
+        entry_path.set_extension("pack");
 
-        let file = std::fs::File::open(epb.as_path())?;
+        let file = std::fs::File::open(entry_path.as_path())?;
         let mmap = unsafe { MmapOptions::new().map(&file)? };
         let packfile = MmapPackReader::new(mmap);
-        stores.push(PackStore::new(packfile, idx));
-    }
+
+        Ok(PackStore::new(packfile, idx))
+    }).collect::<Result<Vec<_>, _>>()?;
 
     Ok(stores)
 }

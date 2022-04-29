@@ -108,10 +108,10 @@ pub fn packfile_read<R: BufRead, W: Write>(
             let mut deflate_stream = ZlibDecoder::new(input);
             std::io::copy(&mut deflate_stream, output)?;
             *read_bytes = 1 + count + deflate_stream.total_in();
-            return Ok(PackfileEntryMeta {
+            Ok(PackfileEntryMeta {
                 expected_type: PackfileType::Plain(obj_type.try_into()?),
                 expected_size: size
-            });
+            })
         },
 
         OFS_DELTA => {
@@ -131,7 +131,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
             deflate_stream.read_to_end(&mut instructions)?;
 
             *read_bytes = 2 + count + deflate_stream.total_in();
-            return Ok(PackfileEntryMeta {
+            Ok(PackfileEntryMeta {
                 expected_type: PackfileType::OffsetDelta((offset, instructions)),
                 expected_size: size
             })
@@ -146,7 +146,7 @@ pub fn packfile_read<R: BufRead, W: Write>(
             let mut instructions = Vec::new();
             deflate_stream.read_to_end(&mut instructions)?;
             *read_bytes = 21 + count + deflate_stream.total_in();
-            return Ok(PackfileEntryMeta {
+            Ok(PackfileEntryMeta {
                 expected_type: PackfileType::RefDelta((id, instructions)),
                 expected_size: size
             })

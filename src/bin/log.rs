@@ -15,7 +15,7 @@ pub fn main() -> std::io::Result<()> {
         &args[1]
     };
 
-    let id = match ref_set.deref(&query) {
+    let id = match ref_set.deref(query) {
         Some(result) => result.clone(),
         None => {
             match query.parse() {
@@ -26,7 +26,7 @@ pub fn main() -> std::io::Result<()> {
     };
 
     for (id, commit) in storage_set.commits(&id, None) {
-        let message = std::str::from_utf8(&commit.message()).expect("not utf8");
+        let message = std::str::from_utf8(commit.message()).expect("not utf8");
         let lines: Vec<&str> = message.split('\n').collect();
         println!("\x1b[33m{} \x1b[0m{}", id, lines[0]);
     };

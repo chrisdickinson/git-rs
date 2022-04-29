@@ -17,10 +17,7 @@ pub struct Store {
 impl Store {
     pub fn new<C>(func: C, filter: Option<[bool; 256]>) -> Self
         where C: Fn(&Id) -> Result<Option<Box<dyn std::io::Read>>> + 'static + Send + Sync {
-        let filter = match filter {
-            Some(xs) => xs,
-            None => [true; 256]
-        };
+        let filter = filter.unwrap_or([true; 256]);
 
         Store {
             read: Box::new(func),

@@ -1,5 +1,6 @@
 use crate::errors::{ ErrorKind, Result };
 
+use std::convert::From;
 use std::io::Write;
 
 pub const OFS_DELTA: u8 = 6;
@@ -62,15 +63,15 @@ impl DeltaDecoder {
     }
 }
 
-impl std::convert::Into<DeltaDecoderStream> for DeltaDecoder {
-    fn into(self) -> DeltaDecoderStream {
+impl From<DeltaDecoder> for DeltaDecoderStream {
+    fn from(dd: DeltaDecoder) -> Self {
         DeltaDecoderStream {
-            instructions: self.instructions,
+            instructions: dd.instructions,
             index: 0,
             written: 0,
             state: DeltaDecoderState::NextCommand,
-            inner: self.inner,
-            output_size: self.output_size
+            inner: dd.inner,
+            output_size: dd.output_size
         }
     }
 }

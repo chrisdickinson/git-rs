@@ -47,17 +47,15 @@ pub struct CommitIterator<'a, S: Queryable> {
 
 impl<'a, S: Queryable> CommitIterator<'a, S> {
     pub fn new(storage_set: &'a StorageSet<S>, id: &Id, seen: Option<HashSet<Id>>) -> CommitIterator<'a, S> {
-        let mut seen = seen.unwrap_or_else(HashSet::<Id>::new);
+        let mut seen = seen.unwrap_or_default();
 
         let first = storage_set.get_and_load(id).ok()
             .unwrap_or(None);
 
         let mut target = BinaryHeap::with_capacity(4);
 
-        if let Some(xs) = first {
-            if let Object::Commit(head) = xs {
-                target.push(IdCommit(id.clone(), head));
-            }
+        if let Some(Object::Commit(head)) = first {
+            target.push(IdCommit(id.clone(), head));
         }
 
         seen.insert(id.clone());
@@ -93,9 +91,9 @@ impl<'a, S: Queryable> Iterator for CommitIterator<'a, S> {
 
                 if let Object::Commit(commit) = storage_set.get_and_load(&id).ok()?? {
                     seen.insert(id.clone());
-                    return Some(IdCommit(id, commit))
+                    Some(IdCommit(id, commit))
                 } else {
-                    return None
+                    None
                 }
             });
 

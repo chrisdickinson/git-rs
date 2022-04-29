@@ -29,7 +29,7 @@ impl Commit {
         let v = self.attributes.get(b"tree" as &[u8])?;
 
         let mut result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(&id_bytes).ok().and_then(|xs| xs.parse().ok())
+            std::str::from_utf8(id_bytes).ok().and_then(|xs| xs.parse().ok())
         }).collect();
         result.pop()
     }
@@ -37,7 +37,7 @@ impl Commit {
     pub fn parents(&self) -> Option<Vec<Id>> {
         let v = self.attributes.get(b"parent" as &[u8])?;
         let result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(&id_bytes).ok().and_then(|xs| xs.parse().ok())
+            std::str::from_utf8(id_bytes).ok().and_then(|xs| xs.parse().ok())
         }).collect();
         Some(result)
     }

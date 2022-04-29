@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::path::Path;
 use std::fs::File;
 use std::io::Read;
 
@@ -64,12 +64,12 @@ impl Ref {
 }
 
 fn recurse_dir(
-    root: &mut PathBuf,
+    root: &Path,
     dirs: &mut Vec<String>,
     map: &mut HashMap<String, Ref>,
     k: Kind
 ) -> Result<(), std::io::Error> {
-    for entry in std::fs::read_dir(root.as_path())? {
+    for entry in std::fs::read_dir(root)? {
         let entry = entry?;
 
         let typ = entry.file_type()?;
@@ -82,7 +82,7 @@ fn recurse_dir(
 
         dirs.push(String::from(filename));
         if typ.is_dir() {
-            recurse_dir(&mut entry.path(), dirs, map, k)?;
+            recurse_dir(&entry.path(), dirs, map, k)?;
         } else {
             let ref_name: String = dirs.join("/");
             if let Ok(reference) = Ref::load(&entry.path(), k) {
@@ -104,13 +104,13 @@ impl RefSet {
         root.push(".git");
         root.push("refs");
         root.push("heads");
-        recurse_dir(&mut root, &mut dirs, &mut map, Kind::Local)?;
+        recurse_dir(&root, &mut dirs, &mut map, Kind::Local)?;
         root.pop();
         root.push("remotes");
-        recurse_dir(&mut root, &mut dirs, &mut map, Kind::Remote)?;
+        recurse_dir(&root, &mut dirs, &mut map, Kind::Remote)?;
         root.pop();
         root.push("tags");
-        recurse_dir(&mut root, &mut dirs, &mut map, Kind::Tag)?;
+        recurse_dir(&root, &mut dirs, &mut map, Kind::Tag)?;
         root.pop();
         root.pop();
         root.push("HEAD");
@@ -118,9 +118,7 @@ impl RefSet {
             map.insert(String::from("HEAD"), reference);
         };
 
-        Ok(RefSet {
-            0: map
-        })
+        Ok(RefSet(map))
     }
 
     pub fn deref(&self, name: &str) -> Option<&Id> {
@@ -129,7 +127,7 @@ impl RefSet {
             match reference {
                 Some(xs) => {
                     match xs.ptr {
-                        RefPtr::Direct(ref id) => return Some(&id),
+                        RefPtr::Direct(ref id) => return Some(id),
                         RefPtr::Indirect(ref string) => {
                             reference = self.0.get(string.as_str());
                         }

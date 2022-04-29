@@ -23,7 +23,7 @@ impl<P: Packfile> Store<P> {
 
 impl<P: Packfile> Queryable for Store<P> {
     fn get<W: Write, S: Queryable>(&self, id: &Id, output: &mut W, backends: &StorageSet<S>) -> Result<Option<Type>> {
-        let (start, end) = match self.index.get_bounds(&id) {
+        let (start, end) = match self.index.get_bounds(id) {
             Some(xs) => xs,
             None => return Ok(None)
         };

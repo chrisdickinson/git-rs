@@ -15,7 +15,7 @@ pub fn main() -> std::io::Result<()> {
         &args[1]
     };
 
-    let id = match ref_set.deref(&query) {
+    let id = match ref_set.deref(query) {
         Some(result) => result.clone(),
         None => {
             match query.parse() {
