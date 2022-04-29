@@ -1,7 +1,7 @@
-use crate::stores::loose::{ Store as LooseStore };
-use crate::pack::index::{ read as read_packidx };
+use crate::stores::loose::Store as LooseStore;
+use crate::pack::index::read as read_packidx;
 use crate::pack::mmap::Reader as MmapPackReader;
-use crate::stores::pack::{ Store as PackStore };
+use crate::stores::pack::Store as PackStore;
 use crate::stores::StorageSet;
 use memmap::MmapOptions;
 use rayon::prelude::*;
