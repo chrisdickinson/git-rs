@@ -12,10 +12,19 @@ pub struct Id {
 }
 
 impl Id {
-    pub fn new<T: AsRef<[u8]>>(bytes: T) -> Id {
-        let mut id = Id::default();
+    pub fn new<T: AsRef<[u8]>>(bytes: T) -> Self {
+        let mut id = Self::default();
         id.bytes.copy_from_slice(bytes.as_ref());
         id
+    }
+
+    pub fn new_from_ascii_bytes<T: AsRef<[u8]>>(bytes: T) -> Result<Self, Error> {
+        let bytes = bytes.as_ref();
+        if bytes.len() < 40 {
+            return Err(ErrorKind::BadId.into())
+        }
+
+        Ok(from_ascii_bytes(&bytes[0..40])?.into())
     }
 
     pub fn read_packed_ids<R: Read>(input: &mut R, count: usize) -> crate::errors::Result<Vec<Id>> {
@@ -50,26 +59,29 @@ impl AsRef<[u8]> for Id {
 impl FromStr for Id {
     type Err = Error;
 
-    fn from_str(target: &str) -> Result<Self, Self::Err> {
-        let trimmed = target.trim();
-        if trimmed.len() != 40 {
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if input.len() < 40 {
             return Err(ErrorKind::BadId.into())
         }
 
-        let mut id = Id::default();
-        for (cursor, xs) in target.bytes().enumerate() {
-            let incoming = match xs {
-                48 ..= 57 => xs - 48,
-                97 ..= 102 => xs - 97 + 10,
-                65 ..= 70 => xs - 65 + 10,
-                _ => return Err(ErrorKind::BadId.into())
-            };
-            let to_shift = ((1 + cursor) & 1) << 2;
-            id.bytes[cursor >> 1] |= incoming << to_shift;
-        }
-
-        Ok(id)
+        Ok(from_ascii_bytes(&input.as_bytes()[0..40])?.into())
     }
+}
+
+#[inline]
+fn from_ascii_bytes(input: &[u8]) -> Result<[u8; 20], Error> {
+    let mut output = [0u8; 20];
+    for (cursor, xs) in input.iter().enumerate() {
+        let incoming = match xs {
+            48 ..= 57 => xs - 48,
+            97 ..= 102 => xs - 97 + 10,
+            65 ..= 70 => xs - 65 + 10,
+            _ => return Err(ErrorKind::BadId.into())
+        };
+        let to_shift = ((1 + cursor) & 1) << 2;
+        output[cursor >> 1] |= incoming << to_shift;
+    }
+    Ok(output)
 }
 
 impl Display for Id {

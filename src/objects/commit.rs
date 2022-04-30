@@ -8,7 +8,9 @@ use crate::id::Id;
 pub struct Commit {
     attributes: HashMap<Vec<u8>, Vec<Vec<u8>>>,
     committer: Option<HumanMetadata>,
-    author: Option<HumanMetadata>,
+    authors: Vec<HumanMetadata>,
+    parents: Vec<Id>,
+    tree: Option<Id>,
     message: Vec<u8>
 }
 
@@ -21,25 +23,22 @@ impl Commit {
         &self.committer
     }
 
-    pub fn author(&self) -> &Option<HumanMetadata> {
-        &self.author
+    pub fn author(&self) -> Option<&HumanMetadata> {
+        self.authors.first()
     }
 
-    pub fn tree(&self) -> Option<Id> {
-        let v = self.attributes.get(b"tree" as &[u8])?;
-
-        let mut result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(id_bytes).ok().and_then(|xs| xs.parse().ok())
-        }).collect();
-        result.pop()
+    pub fn tree(&self) -> Option<&Id> {
+        self.tree.as_ref()
     }
 
-    pub fn parents(&self) -> Option<Vec<Id>> {
-        let v = self.attributes.get(b"parent" as &[u8])?;
-        let result: Vec<Id> = v.iter().filter_map(|id_bytes| {
-            std::str::from_utf8(id_bytes).ok().and_then(|xs| xs.parse().ok())
-        }).collect();
-        Some(result)
+    pub fn parents(&self) -> &[Id] {
+        self.parents.as_slice()
+    }
+}
+
+impl AsRef<HashMap<Vec<u8>, Vec<Vec<u8>>>> for Commit {
+    fn as_ref(&self) -> &HashMap<Vec<u8>, Vec<Vec<u8>>> {
+        &self.attributes
     }
 }
 
@@ -64,15 +63,21 @@ impl Commit {
         let mut message_idx = 0;
 
         let mut attributes = HashMap::new();
-        for (idx, byte) in buf.iter().enumerate() {
-            let next = match mode {
+
+        let mut authors = Vec::new();
+        let mut committer = None;
+        let mut parents = Vec::new();
+        let mut tree = None;
+
+        for (idx, ref byte) in buf.iter().enumerate() {
+            mode = match mode {
                 Mode::Attr => {
-                    match *byte {
-                        0x20 => {
+                    match byte {
+                        b' ' => {
                             space = idx;
                             Mode::Value
                         },
-                        0x0a => {
+                        b'\n' => {
                             if anchor == idx {
                                 message_idx = idx + 1;
                                 break
@@ -85,13 +90,38 @@ impl Commit {
 
                 Mode::Value => {
                     match *byte {
-                        0x0a => {
-                            let key = buf[anchor..space].to_vec();
-                            let value = buf[space + 1..idx].to_vec();
-                            attributes
-                                .entry(key)
-                                .or_insert_with(Vec::new)
-                                .push(value);
+                        b'\n' => {
+                            match &buf[anchor..space] {
+                                b"author" => {
+                                    authors.push(HumanMetadata::new(buf[space + 1..idx].to_vec()));
+                                },
+
+                                b"parent" => {
+                                    parents.push(Id::new_from_ascii_bytes(&buf[space + 1..idx])?)
+                                },
+
+                                b"committer" => {
+                                    committer.replace(HumanMetadata::new(buf[space + 1..idx].to_vec()));
+                                },
+
+                                b"tree" => {
+                                    tree.replace(Id::new_from_ascii_bytes(&buf[space + 1..idx])?);
+                                },
+
+                                // TODO: gpgsig is unlike other attributes: it may span multiple lines.
+                                // It'll need to be handled specifically.
+                                b"gpgsig" => {},
+
+                                _ => {
+                                    let key = buf[anchor..space].to_vec();
+                                    let value = buf[space + 1..idx].to_vec();
+                                    attributes
+                                        .entry(key)
+                                        .or_insert_with(Vec::new)
+                                        .push(value);
+                                }
+                            }
+
                             anchor = idx + 1;
                             space = idx;
                             Mode::Attr
@@ -100,25 +130,17 @@ impl Commit {
                     }
                 }
             };
-
-            mode = next;
         }
 
         let message = buf[message_idx..].to_vec();
-
-        let committer = attributes.get_mut(b"committer" as &[u8]).and_then(|xs| {
-            xs.pop()
-        }).map(HumanMetadata::new);
-
-        let author = attributes.get_mut(b"author" as &[u8]).and_then(|xs| {
-            xs.pop()
-        }).map(HumanMetadata::new);
 
         Ok(Commit {
             attributes,
             committer,
             message,
-            author
+            parents,
+            tree,
+            authors
         })
     }
 }
