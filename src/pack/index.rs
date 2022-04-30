@@ -245,37 +245,27 @@ impl Index {
             0
         };
         let mut hi = self.fanout[as_bytes[0] as usize];
-        let mut middle: usize;
         let len = self.offsets.len();
         loop {
-            middle = ((lo + hi) >> 1) as usize;
-            if middle >= len {
-                return None
-            }
+            let middle = ((lo + hi) >> 1) as usize;
 
             match id.partial_cmp(&self.ids[middle]) {
-                Some(xs) => match xs {
-                    std::cmp::Ordering::Less => {
-                        hi = middle as u32;
-                    },
-                    std::cmp::Ordering::Greater => {
-                        lo = (middle + 1) as u32;
-                    },
-                    std::cmp::Ordering::Equal => {
-                        return Some((
-                            self.offsets[middle],
-                            self.offsets[self.next_offsets_indices[middle]]
-                        ));
-                    }
+                Some(std::cmp::Ordering::Less) => { hi = middle as u32; },
+                Some(std::cmp::Ordering::Greater) => { lo = (middle + 1) as u32; }
+                Some(std::cmp::Ordering::Equal) => {
+                    return Some((
+                        self.offsets[middle],
+                        self.offsets[self.next_offsets_indices[middle]]
+                    ));
                 },
-                None => return None
+                None => {
+                    return None;
+                }
             }
 
-            if lo >= hi {
-                break
+            if lo >= hi || middle >= len {
+                return None
             }
         }
-
-        None
     }
 }
