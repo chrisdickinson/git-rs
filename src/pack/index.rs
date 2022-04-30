@@ -206,7 +206,7 @@ pub fn read<R: Read>(mut input: R) -> Result<Index> {
     }).collect();
 
     let mut offset_idx_sorted: Vec<(usize, &u64)> = offsets.iter().enumerate().collect();
-    offset_idx_sorted.sort_by_key(|(_, offset)| *offset);
+    offset_idx_sorted.sort_unstable_by_key(|(_, offset)| *offset);
 
     let mut next_offsets_indices = vec![0; offset_idx_sorted.len()];
     let mut idx = 0;
