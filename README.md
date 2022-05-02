@@ -2,6 +2,9 @@
 
 Implementing git in rust for fun and education!
 
+If you're looking for a native Rust Git implementation ready for use in anger, you
+might consider looking at [`gitoxide`](https://github.com/Byron/gitoxide) instead!
+
 This is actually my second stab at it, so big blocks will land in place from my
 first attempt. I'm trying again this year after reading more of "Programming
 Rust" (Blandy, Orendorff).
@@ -35,6 +38,7 @@ Rust" (Blandy, Orendorff).
     - [ ] Write git index cache
 - [ ] Create interface for writing new objects
 - [ ] Add benchmarks
+- [ ] Code coverage
 - [ ] Create packfile from list of objects (API TKTK)
 - [ ] Network protocol
     - [ ] receive-pack
@@ -46,6 +50,30 @@ Rust" (Blandy, Orendorff).
 * * *
 
 ## PLAN
+
+### 2022-04-30 Update
+
+- I did a bit of optimizing and my (completely unscientific) benchmarking has us pretty close to native `git log`!
+- I'm currently measuring the performance of `git log --pretty=oneline >/dev/null` vs. `git_rs_log >/dev/null` against a local checkout of [`nodejs/node`](https://github.com/nodejs/node).
+    - This is on a M1 Pro Max Macbook Pro.
+    - `git_rs_log` started out at ~500ms for a complete walk of the repo history. Vanilla git was seeing ~280-300ms.
+- I'm used to using DTrace + flamegraphs to profile, but to my dismay using DTrace requires booting into recovery mode on modern macOS & disabling system integrity protection.
+    - at least, that was what my first investigation turned up. It looks like there [may be other options](https://poweruser.blog/using-dtrace-with-sip-enabled-3826a352e64b) I missed.
+- My coworker [Eric](https://twitter.com/evntdrvn) suggested using macOS's Instruments.app instead via [`cargo-instruments`](https://crates.io/crates/cargo-instruments) which worked a treat.
+- Running cargo instruments necessitated exposing a way to set the current working directory for `git_rs_log`, so I added `clap`.
+- I'm pleased to report we were able to bring `git_rs_log` down to 300-320ms for a full walk of node's history. Here's what I did:
+    - Switching deflate2 from it's `miniz_oxide` backend (the default, written in rust) to native zlib was the biggest boost
+    - Switching a `sort_by_key` to `sort_unstable_by_key` in packfile index reads was a small (5-7ms) win. (Packfile indices have a fanout table, a list of ids in ascending order by id value, and a list of offsets-in-the-packfile whose order corresponds to the ids. In order to use a packfile index to read from a packfile, though, you need to be able to read the offset for your incoming id request _and_ the next id in the packfile in offset order. Hence the `sort_by_key` call – once we've loaded the ids and offsets, we have to keep a mapping of position of id -> position in packfile.)
+    - Tuning up the commit parser gave me another 10ms or so. Out of expediency, I had originally treated commits as HTTP transaction-like – newline-separated key/value headers followed by a double newline then the message. Now I actually store the well-known fields directly on the struct in parsed form. (There's still room for improvement here, too!)
+        - This required adding an `Id::from_ascii_bytes(&[u8])` for hexadecimal-encoded ids
+            - Before this you'd have to bounce through `std::str::from_utf8` which validates that the vector contains valid utf8 before we validate that it only contains hexadecimal chars; now we can do both in one step.
+- I'm pretty happy with that performance (for now), so I'm looking for something to pick up next. Options include:
+    - Support for the worktree index file, `.git/index`. This is the start of the path for writing objects to the Git database.
+    - Better support for refs.
+    - Support for SHA256 object format. (Vanilla Git supports this now, so it'd be interesting to dig into how it works.)
+    - Another Rust project, for a change of pace.
+        - Postgres change data capture support, a la Debezium (but not tied to kafka.)
+        - A return to WASM text parsing (I have a private project called "watto" for this.)
 
 ### 2022-04-27 Update
 
