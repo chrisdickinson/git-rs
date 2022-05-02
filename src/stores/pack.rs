@@ -11,10 +11,7 @@ use std;
 
 use delta::{DeltaDecoder, OFS_DELTA, REF_DELTA};
 use repository::Repository;
-use objects::commit::Commit;
-use objects::tree::Tree;
-use objects::blob::Blob;
-use objects::GitObject;
+use objects::Type;
 
 #[derive(Debug)]
 pub struct Store {
@@ -39,14 +36,8 @@ impl Store {
             index: index
         })
     }
-}
 
-impl Queryable for Store {
-    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<GitObject>, GitError> {
-        let (start, end) = match self.index.get_bounds(&id) {
-            Some(xs) => xs,
-            None => return Ok(None)
-        };
+    pub fn read_bounds (&self, start: u64, end: u64, repository: &Repository) -> Result<(u8, Box<std::io::Read>), GitError> {
         let file = File::open(&self.packfile_path)?;
         let mut buffered_file = BufReader::new(file);
         buffered_file.seek(SeekFrom::Start(start))?;
@@ -90,29 +81,84 @@ impl Queryable for Store {
             size |= next << (4 + 7 * (count - size_vec.len()));
         }
 
-        let (t, decoder_stream): (u8, Box<std::io::Read>) = if type_flag <= 4 {
-            // grumble, grumble: we must strip the zlib header off of our content.
-            let mut zlib_header = [0u8; 2];
-            object_stream.read_exact(&mut zlib_header)?;
-            (type_flag, Box::new(DeflateDecoder::new(object_stream)))
-        } else {
-            let decoder = if type_flag == OFS_DELTA {
-                DeltaDecoder::from_offset_delta(Box::new(object_stream), self)
-            } else {
-                DeltaDecoder::from_ref_delta(Box::new(object_stream), repo)
-            };
-            let final_type = decoder.get_type();
-            (final_type, Box::new(decoder))
-        };
+        match type_flag {
+            _ => Err(GitError::Unknown),
 
-        if t == 1 {
-            return Ok(Some(GitObject::CommitObject(Commit::from(id, decoder_stream))));
-        } else if t == 2 {
-            return Ok(Some(GitObject::TreeObject(Tree::from(id, decoder_stream))));
-        } else if t == 3 {
-            return Ok(Some(GitObject::BlobObject(Blob::from(id, decoder_stream))));
+            0...4 => {
+                let mut zlib_header = [0u8; 2];
+                object_stream.read_exact(&mut zlib_header)?;
+                Ok((type_flag, Box::new(DeflateDecoder::new(object_stream))))
+            },
+
+            OFS_DELTA => {
+                let mut take_one = object_stream.take(1);
+                take_one.read_exact(&mut byte)?;
+                let mut offset = (byte[0] & 0x7F) as u64;
+                let mut original_stream = take_one.into_inner();
+
+                while byte[0] & 0x80 > 0 {
+                    offset += 1;
+                    offset <<= 7;
+                    take_one = original_stream.take(1);
+                    take_one.read_exact(&mut byte)?;
+                    offset += (byte[0] & 0x7F) as u64;
+                    original_stream = take_one.into_inner();
+                }
+
+                let mut zlib_header = [0u8; 2];
+                original_stream.read_exact(&mut zlib_header)?;
+                let mut deflate_stream = DeflateDecoder::new(original_stream);
+                let mut instructions = Vec::new();
+                deflate_stream.read_to_end(&mut instructions);
+
+                let (base_type, stream) = match self.read_bounds(start - offset, start, repository) {
+                    Ok(xs) => xs,
+                    Err(e) => return Err(e)
+                };
+
+                Ok((base_type, Box::new(DeltaDecoder::new(&instructions, stream))))
+            },
+
+            REF_DELTA => {
+                let mut ref_bytes = [0u8; 20];
+                object_stream.read_exact(&mut ref_bytes)?;
+                let id = Id::from_bytes(&ref_bytes);
+
+                let mut zlib_header = [0u8; 2];
+                object_stream.read_exact(&mut zlib_header)?;
+                let mut deflate_stream = DeflateDecoder::new(object_stream);
+                let mut instructions = Vec::new();
+                deflate_stream.read_to_end(&mut instructions);
+
+                let (t, base_stream) = match repository.get_object(&id)? {
+                    Some(xs) => match xs {
+                        Type::Commit(stream) => (1, stream),
+                        Type::Tree(stream) => (2, stream),
+                        Type::Blob(stream) => (3, stream),
+                        Type::Tag(stream) => (4, stream)
+                    },
+                    None => return Err(GitError::Unknown)
+                };
+
+                Ok((t, Box::new(DeltaDecoder::new(&instructions, base_stream))))
+            }
         }
-        println!("pack get: {:?}", t);
-        Err(GitError::Unknown)
+    }
+}
+
+impl Queryable for Store {
+    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<Type>, GitError> {
+        let (start, end) = match self.index.get_bounds(&id) {
+            Some(xs) => xs,
+            None => return Ok(None)
+        };
+        let (t, stream) = self.read_bounds(start, end, repo)?;
+        match t {
+            1 => Ok(Some(Type::Commit(stream))),
+            2 => Ok(Some(Type::Tree(stream))),
+            3 => Ok(Some(Type::Blob(stream))),
+            4 => Ok(Some(Type::Tag(stream))),
+            _ => Err(GitError::Unknown)
+        }
     }
 }

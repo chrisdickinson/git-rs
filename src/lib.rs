@@ -20,7 +20,10 @@ mod tests {
     use repository::Repository;
     use std::path::Path;
     use id::Id;
-    use objects::GitObject;
+    use objects::Type;
+    use objects::commit::Commit;
+    use objects::blob::Blob;
+    use objects::tree::Tree;
     use std::io::Read;
 
     #[test]
@@ -42,20 +45,19 @@ mod tests {
         };
         loop {
             if let Ok(Some(result)) = repo.get_object(&id) {
-                if let GitObject::CommitObject(commit) = result {
-                    println!("commit {} {}", id, commit.message().trim());
-                    let parents = match commit.parents() {
-                        Some(v) => v,
-                        None => {
-                            println!("no gods, no parents");
-                            return
-                        }
-                    };
-                    if let Some(parent) = parents.first() {
-                        id = Id::from(parent.as_str()).expect("failed to get ID");
-                    } else {
+                let commit: Commit = match result.load(&id) {
+                    Ok(xs) => xs,
+                    Err(e) => return
+                };
+                let parents = match commit.parents() {
+                    Some(v) => v,
+                    None => {
+                        println!("no gods, no parents");
                         return
                     }
+                };
+                if let Some(parent) = parents.first() {
+                    id = Id::from(parent.as_str()).expect("failed to get ID");
                 } else {
                     return
                 }
@@ -78,9 +80,9 @@ mod tests {
             Ok(xs) => match xs { Some(ys) => ys, None => return },
             Err(_) => return
         };
-        let commit = match result {
-            GitObject::CommitObject(xs) => xs,
-            _ => return
+        let commit: Commit = match result.load(&id) {
+            Ok(xs) => xs,
+            Err(_) => return
         };
         let tree_id = match commit.tree() {
             Some(xs) => xs,
@@ -88,7 +90,6 @@ mod tests {
         };
 
         let tree = repo.get_object(&Id::from(tree_id).expect("bad tree"));
-        println!("tree: {:?}", tree);
     }
 
     #[test]
@@ -104,9 +105,9 @@ mod tests {
             Ok(xs) => match xs { Some(ys) => ys, None => return },
             Err(_) => return
         };
-        let commit = match result {
-            GitObject::CommitObject(xs) => xs,
-            _ => return
+        let commit: Commit = match result.load(&id) {
+            Ok(xs) => xs,
+            Err(_) => return
         };
 
         let git_object = match repo.get_path_at_commit(&commit, vec!("src", "stores", "loose.rs")) { 
@@ -116,8 +117,8 @@ mod tests {
             },
             Err(_) => return
         };
-        let mut git_blob = match git_object {
-            GitObject::BlobObject(xs) => xs,
+        let mut git_blob: &Blob = match git_object.load(&commit) {
+            Ok(xs) => xs,
             _ => return
         };
 

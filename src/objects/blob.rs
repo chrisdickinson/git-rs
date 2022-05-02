@@ -1,5 +1,7 @@
 use std;
 use id::Id;
+use objects::CanLoad;
+use error::GitError;
 
 pub struct Blob {
     id: Id,
@@ -12,14 +14,14 @@ impl std::fmt::Debug for Blob {
     }
 }
 
-impl Blob {
-    pub fn from (id: &Id, mut handle: Box<std::io::Read>) -> Blob {
+impl CanLoad for Blob {
+    pub fn from (id: &Id, mut handle: Box<std::io::Read>) -> Result<&Self, GitError> {
         let mut reader = handle;
 
-        Blob {
+        Ok(&Blob {
             id: Id::clone(id),
             contents: reader
-        }
+        })
     }
 }
 

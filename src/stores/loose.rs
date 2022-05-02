@@ -1,11 +1,8 @@
 use flate2::bufread::DeflateDecoder;
-use objects::commit::Commit;
-use objects::tree::Tree;
-use objects::blob::Blob;
 use repository::Repository;
-use objects::GitObject;
 use stores::Queryable;
 use error::GitError;
+use objects::Type;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::fs::File;
@@ -25,7 +22,7 @@ impl Store {
 }
 
 impl Queryable for Store {
-    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<GitObject>, GitError> {
+    fn get(&self, repo: &Repository, id: &Id) -> Result<Option<Type>, GitError> {
 
         let bytes: &[u8; 20] = id.as_slice();
         let first = hex::encode(&bytes[0..1]);
@@ -122,10 +119,11 @@ impl Queryable for Store {
         let body_handle = header_handle;
 
         match typename {
-            "commit" => Ok(Some(GitObject::CommitObject(Commit::from(id, body_handle)))),
-            "tree" => Ok(Some(GitObject::TreeObject(Tree::from(id, body_handle)))),
-            "blob" => Ok(Some(GitObject::BlobObject(Blob::from(id, body_handle)))),
-            &_ => return Err(GitError::Unknown)
+            "commit" => Ok(Some(Type::Commit(body_handle))),
+            "blob" => Ok(Some(Type::Blob(body_handle))),
+            "tree" => Ok(Some(Type::Tree(body_handle))),
+            "tag" => Ok(Some(Type::Tag(body_handle))),
+            &_ => Err(GitError::Unknown)
         }
     }
 }

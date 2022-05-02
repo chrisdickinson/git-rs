@@ -6,7 +6,7 @@ use glob::glob;
 use id::Id;
 use reference::Ref;
 use error::GitError;
-use objects::GitObject;
+use objects::Type;
 use objects::commit::Commit;
 use stores::{Queryable, loose, pack};
 
@@ -108,18 +108,16 @@ impl Repository {
         return None
     }
 
-    pub fn lookup (&self, what: &str) -> Result<Option<GitObject>, GitError> {
+    pub fn lookup (&self, what: &str) -> Result<Option<Type>, GitError> {
         if let Some(id) = self.rev_parse(what) {
             return self.get_object(&id)
         }
         Ok(None)
     }
 
-    pub fn get_object(&self, id: &Id) -> Result<Option<GitObject>, GitError> {
-        println!("get_object {:?}", id);
+    pub fn get_object(&self, id: &Id) -> Result<Option<Type>, GitError> {
         for store in &self.stores {
             let xs = store.get(self, id);
-            println!("??? {:?}", xs);
             let result = match xs {
                 Ok(v) => v,
                 Err(err) => return Err(err),
@@ -132,51 +130,7 @@ impl Repository {
         return Ok(None);
     }
 
-    pub fn get_path_at_commit(&self, what: &Commit, path: Vec<&str>) -> Result<Option<GitObject>, GitError> {
-        let tree_id_str = match what.tree() {
-            Some(xs) => xs,
-            None => return Ok(None)
-        };
-
-        let tree_id = Id::from(tree_id_str)?;
-        let tree = match self.get_object(&tree_id)? {
-            Some(git_object) => {
-                match git_object {
-                    GitObject::TreeObject(tree) => tree,
-                    _ => return Ok(None)
-                }
-            },
-            None => return Ok(None)
-        };
-
-        let result = path.iter().fold(Ok(Some(GitObject::TreeObject(tree))), |prev: Result<Option<GitObject>, GitError>, xs| {
-            let object = match prev? {
-                Some(xs) => xs,
-                None => return Ok(None)
-            };
-
-            let tree = match object {
-                GitObject::TreeObject(tree) => tree,
-                _ => return Ok(None)
-            };
-
-            let entry = match tree.lookup(xs) {
-                Some(xs) => xs,
-                None => return Ok(None)
-            };
-
-            let next_object = match self.get_object(&entry.id)? {
-                Some(git_object) => git_object,
-                None => return Ok(None)
-            };
-
-            match next_object {
-                GitObject::TreeObject(next_tree) => Ok(Some(GitObject::TreeObject(next_tree))),
-                GitObject::BlobObject(next_blob) => Ok(Some(GitObject::BlobObject(next_blob))),
-                _ => return Ok(None)
-            }
-        });
-
-        result
+    pub fn get_path_at_commit(&self, what: &Commit, path: Vec<&str>) -> Result<Option<Type>, GitError> {
+        Ok(None)
     }
 }
