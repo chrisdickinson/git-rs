@@ -1,4 +1,4 @@
-use crc::crc32::{ self, Digest as CRCDigest, Hasher32 };
+use crc::{ Crc, CRC_32_ISO_HDLC };
 use crypto::{ sha1::Sha1, digest::Digest };
 use byteorder::{ BigEndian, ReadBytesExt };
 use std::io::prelude::*;
@@ -36,14 +36,15 @@ pub fn write<R, W, S>(
     // second pass: calculate crcs between offsets
     let windows: Vec<_> = offsets.windows(2).collect();
     let crcs: Vec<_> = windows.par_iter().filter_map(|offset| {
-        let mut digest = CRCDigest::new(crc32::IEEE);
+        let crc = Crc::<u32>::new(&CRC_32_ISO_HDLC);
+        let mut digest = crc.digest();
 
         let mut cursor = input.clone();
         cursor.seek(SeekFrom::Start(offset[0])).ok()?;
         let mut input_bytes = Vec::with_capacity((offset[1] - offset[0]) as usize);
         cursor.take(offset[1] - offset[0]).read_to_end(&mut input_bytes).ok()?;
-        digest.write(&input_bytes);
-        Some(digest.sum32())
+        digest.update(&input_bytes);
+        Some(digest.finalize())
     }).collect();
 
     if crcs.len() != objects.len() {
