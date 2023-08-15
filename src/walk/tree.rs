@@ -1,8 +1,6 @@
-use std::collections::btree_map::{ IntoIter };
+use std::{collections::btree_map::{ IntoIter }, ffi::OsString};
 use std::path::{ PathBuf };
 use std::ffi::OsStr;
-use std::os::unix::ffi::OsStrExt;
-
 use crate::objects::tree::{ TreeEntry, FileMode };
 use crate::stores::{ StorageSet, Queryable };
 use crate::objects::blob::Blob;
@@ -42,13 +40,13 @@ impl<'a, S: Queryable> Iterator for TreeIterator<'a, S> {
             if let Some(xs) = item {
                 match xs {
                     Object::Tree(xs) => {
-                        self.path_segments.push(OsStr::from_bytes(&key));
+                        self.path_segments.push(OsStr::from_byte(&key).as_os_str());
                         self.layers.push(xs.into_iter());
                     },
 
                     Object::Blob(xs) => {
                         let mut pb = self.path_segments.clone();
-                        pb.push(OsStr::from_bytes(&key));
+                        pb.push(OsStr::from_byte(&key).as_os_str());
                         return Some(
                             (pb, entry.mode, xs)
                         )
@@ -57,6 +55,23 @@ impl<'a, S: Queryable> Iterator for TreeIterator<'a, S> {
                     _ => continue
                 }
             }
+        }
+    }
+}
+
+trait FromBytes {
+    fn from_byte(bytes: &[u8]) -> OsString;
+}
+
+impl FromBytes for OsStr {
+    fn from_byte(bytes: &[u8]) -> OsString {
+        #[cfg(unix)] {
+            use std::os::unix::ffi::OsStrExt;
+            OsStr::from_bytes(bytes).to_os_string()
+        }
+        #[cfg(windows)] {
+            use std::os::windows::prelude::*;
+            OsString::from_wide(bytes.iter().map(|x| *x as u16).collect::<Vec<u16>>().as_slice())
         }
     }
 }
